@@ -1,0 +1,16 @@
+# npm stuff
+node_modules/
+package-lock.json
+
+# python stuff
+.pyc
+__pycache__/
+
+# virtualenv
+venv/
+
+#security
+secrets/
+
+#db stuff
+*.sqlite3

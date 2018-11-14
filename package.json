@@ -1,0 +1,27 @@
+{
+  "name": "jobtracker",
+  "version": "0.0.0",
+  "description": "Track Job Applications",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JayWelborn/JobTracker.git"
+  },
+  "author": "Jay Welborn",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/JayWelborn/JobTracker/issues"
+  },
+  "homepage": "https://github.com/JayWelborn/JobTracker#readme",
+  "devDependencies": {
+    "autoprefixer": "^9.3.1",
+    "gulp": "^4.0.0",
+    "gulp-concat": "^2.6.1",
+    "gulp-postcss": "^8.0.0",
+    "gulp-sass": "^4.0.2",
+    "gulp-sourcemaps": "^2.6.4"
+  }
+}

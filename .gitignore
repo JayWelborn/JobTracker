@@ -5,6 +5,9 @@ node_modules/
 .pyc
 __pycache__/
 
+#ide stuff
+.idea/
+
 # virtualenv
 venv/
 

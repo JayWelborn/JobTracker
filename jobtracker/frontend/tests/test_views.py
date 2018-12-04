@@ -18,9 +18,11 @@ class IndexViewTests(TestCase):
     """Tests for Index View
 
     Methods:
-        setUp: Recreate data between tests
-        test_response_code: Ensure GET requests always return 200, whether or
-                            not a user is authenticated.
+        setUp:
+            Recreate data between tests
+        test_response_code:
+            Ensure GET requests always return 200, whether or not a user is
+            authenticated.
 
     References:
         https://docs.djangoproject.com/en/2.1/topics/testing/overview/

@@ -8,4 +8,4 @@ from django.views.generic import TemplateView
 # Home Page View
 class IndexView(TemplateView):
 
-    template_name = 'home/index.html'
+    template_name = 'frontend/index.html'

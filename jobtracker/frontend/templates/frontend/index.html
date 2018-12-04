@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+{% load static %}
+<html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>Django DRF - React : Quickstart - Valentino G. - www.valentinog.com</title>
+    </head>
+    <body>
+        {% if request.user.is_authenticated %}
+              <div id="app" class="columns"><!-- React --></div>
+        {% else %}
+            <n1>Log In</n1>
+        {% endif %}
+      </section>
+    </body>
+    {% if request.user.is_authenticated %}
+        <script src="{% static 'frontend/main.js' %}"></script>
+    {% endif %}
+</html>

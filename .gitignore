@@ -16,3 +16,6 @@ secrets/
 
 #db stuff
 *.sqlite3
+
+#generated files
+webpack-stats.json

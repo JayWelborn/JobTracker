@@ -43,4 +43,3 @@ class IndexViewTests(TestCase):
         self.client.login(username=USERNAME_1, password=PASSWORD_1)
         response = self.client.get('')
         self.assertEqual(response.status_code, RESPONSE_OK)
-

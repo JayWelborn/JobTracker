@@ -18,7 +18,7 @@ from django.urls import path
 from .views import IndexView
 
 # Allow app's urlconf to be accessed externally via "reverse" method
-app_name = 'home'
+app_name = 'frontend'
 
 urlpatterns = [
     # ex: [domain]/

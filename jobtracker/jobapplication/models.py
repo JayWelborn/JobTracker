@@ -64,10 +64,8 @@ class JobApplication(models.Model):
         status:             Current state of job application
         creator:            User who created this job application
         submitted_date:     Date application was submitted
-        followup_date:      Date followup email/phonecall was sent/made
-        phone_screen_date:  Date of the phone screening
+        updated_date:       Date of last update to application status
         interview_date:     Date of the interview
-        offer_date:         Date job offer was received
         rejected_date:      Date rejection was received
         rejected_reason:    Reason application was rejected
 
@@ -129,6 +127,11 @@ class JobApplication(models.Model):
         null=True
     )
 
+    interview_date = models.DateField(
+        blank=True,
+        null=True
+    )
+
     rejected_date = models.DateField(
         blank=True,
         null=True
@@ -146,52 +149,73 @@ class JobApplication(models.Model):
     )
 
     @transition(field=status, source="*", target="rejected")
-    def reject(self, reason):
+    def reject(self, reason: str) -> None:
         """
         Set application's state to 'Rejected'.
         :param: reason
             Reason application was rejected
         """
         # Raise exception if dates are suspicious
-        if date.today() < self.submitted_date:
+        today = date.today()
+        if today < self.submitted_date:
             raise IncompatibleDateException(
                 "Rejected date cannot predate submission"
             )
         self.rejected_reason = reason
-        self.rejected_date = date.today()
+        self.rejected_date = today
         self.rejected_state = self.status
         # avoid concurrent db operations
         with transaction.atomic():
             self.save()
 
     @transition(field=status, source="submitted", target="followup_sent")
-    def send_followup(self):
+    def send_followup(self) -> None:
         """
         Set application's state to 'followup_sent' and set the followup_date
         to current date.
         """
+        today = date.today()
         # Raise exception if dates are suspicious
-        if date.today() < self.submitted_date:
+        if today < self.submitted_date:
             raise IncompatibleDateException(
                 "Followup date cannot predate submission"
             )
-        self.updated_date = date.today()
+        self.updated_date = today
         # avoid concurrent db operations
         with transaction.atomic():
             self.save()
 
     @transition(field=status, source="followup_sent",
                 target="phone_screen_complete")
-    def phone_screen(self):
+    def phone_screen(self) -> None:
         """
         Set application's state to 'phone_screen_complete'
         """
         # Raise exception if dates are suspicious
-        if date.today() < self.submitted_date:
+        today = date.today()
+        if today < self.submitted_date:
             raise IncompatibleDateException(
-                "Followup date cannot predate submission"
+                "Phone Screen date cannot predate submission"
             )
-        self.updated_date = date.today()
+        self.updated_date = today
+        # avoid concurrent db operations
+        with transaction.atomic():
+            self.save()
+
+    @transition(field=status, source="phone_screen_complete",
+                target="interview_scheduled")
+    def schedule_interview(self, interview_date: date) -> None:
+        """
+        Set application's state to 'interview_scheduled' and update
+        interview_date field with provided date.
+        """
+        today = date.today()
+        if today > interview_date:
+            raise IncompatibleDateException(
+                "Interview date cannot be in the past"
+            )
+        self.updated_date = today
+        self.interview_date = interview_date
         # avoid concurrent db operations
         with transaction.atomic():
             self.save()

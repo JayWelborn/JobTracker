@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from django.test import TestCase
 
 from jobapplication.models import Company, JobApplication, JobReference
+from jobapplication.exceptions import IncompatibleDateException
 from jobtracker.tests.helpers import create_user
 
 USERNAME_1 = "fleerdygort"
@@ -99,6 +100,22 @@ class JobApplicationTests(TestCase):
             should update the status to 'phone_screen_complete' and set its
             updated_date ot the current date
 
+        test_phone_screen_to_interview_scheduled: Scheduling the interview
+            should update status to 'interview_scheduled', set updated_date to
+            current date, and set interview_date to provided date
+
+        test_attempt_to_schedule_interview_invalid_date: Attempting to schedule
+            an interview for a date in the past should throw an
+            IncompatibleDateException with the message "Interview date cannot
+            be in the past"
+
+        test_interview_complete: Completing the interview should set status to
+            interview_complete and set updated_date to current date
+
+        test_attempt_to_complete_interview_before_scheduled: Attempting to
+            complete an interview before its scheduled date should raise an
+            IllegalDateExcetion
+
         test_submitted_to_rejected: Models should be able to transition from
             'submitted' to 'rejected' status. Reason message provided in reject
             method should be saved to models "rejected_reason" field.
@@ -119,6 +136,7 @@ class JobApplicationTests(TestCase):
             today, respectively. interview_date should remain unchanged
 
     References:
+        https://github.com/viewflow/django-fsm
 
     """
 
@@ -208,6 +226,66 @@ class JobApplicationTests(TestCase):
         self.assertEqual(self.jobapp.updated_date, self.dates[0])
         self.assertEqual(self.jobapp.interview_date, next_week)
 
+    def test_attempt_to_schedule_interview_invalid_date(self):
+        """
+        Attempting to schedule an interview in the past should throw an
+        IncompatibleDateException with the message "Interview date cannot be
+        in the past".
+        """
+        # Move object through state pattern
+        self.jobapp.send_followup()
+        self.jobapp.phone_screen()
+
+        # Attempt to schedule interview for the past
+        try:
+            self.jobapp.schedule_interview(self.dates[1])
+        except IncompatibleDateException as e:
+            self.assertEqual(str(e), "Interview date cannot be in the past")
+
+    def test_interview_complete(self):
+        """
+        Completing interview should set state to 'interview_complete' and set
+        updated_date to today
+        """
+        # Move object through state pattern and hard set updated_date and
+        # interview_date to a day in the past
+        self.jobapp.send_followup()
+        self.jobapp.phone_screen()
+        # Schedule interview for today (should be acceptable)
+        self.jobapp.schedule_interview(self.dates[0])
+        # Reset updated date to be in the past
+        self.jobapp.updated_date = self.dates[4]
+        self.jobapp.save()
+
+        # Complete interview
+        self.jobapp.complete_interview()
+        self.assertEqual(self.jobapp.status, "interview_complete")
+        self.assertEqual(self.jobapp.updated_date, self.dates[0])
+
+    def test_attempt_to_complete_interview_before_scheduled(self):
+        """
+        Attempting to complete an interview before its scheduled date should
+        raise an IllegalDateExcetion
+        """
+        # Move object through state pattern and hard set date to day in the past
+        self.jobapp.send_followup()
+        self.jobapp.phone_screen()
+        self.jobapp.updated_date = self.dates[5]
+        self.jobapp.save()
+
+        # Schedule interview for 7 days in the future
+        next_week = self.dates[0] + timedelta(days=7)
+        self.jobapp.schedule_interview(next_week)
+
+        # Attempt to complete interview
+        try:
+            self.jobapp.complete_interview()
+        except IncompatibleDateException as e:
+            self.assertEqual(
+                str(e),
+                "Interview cannot be completed before scheduled date"
+            )
+
     def test_submitted_to_rejected(self):
         """
         Calling 'reject' method should set status to 'rejected' and set
@@ -277,7 +355,7 @@ class JobApplicationTests(TestCase):
         self.jobapp.schedule_interview(next_week)
         # Reject the application
         self.jobapp.reject("Unknown")
-        #Check status and rejected reason
+        # Check status and rejected reason
         self.assertEqual(self.jobapp.status, "rejected")
         self.assertEqual(self.jobapp.rejected_reason, "Unknown")
         # Check previous state

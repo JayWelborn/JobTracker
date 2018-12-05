@@ -55,6 +55,25 @@ class Company(models.Model):
 class JobApplication(models.Model):
     """Model for a Job Application
 
+    Model uses django-fsm package to implement a simple finite state machine to
+    represent the progression of a job application from 'submitted' to
+    'offer_accepted'.
+
+    The typical progression of a job application is:
+        submitted
+        followup_sent
+        phone_screen_complete
+        interview_scheduled
+        interview_complete
+        offer_recieved
+        offer_accepted
+
+        rejected
+
+    Any state can lead to the 'rejected' state, but otherwise the progression is
+    linear. The model's methods define the side effects of each transition,
+    including how the database should be updated on each state change.
+
     Fields:
         id:                 randomly generated unique id (PK in database)
         Company:            Company with the job opening
@@ -77,6 +96,7 @@ class JobApplication(models.Model):
 
     References:
         https://www.worldatlas.com/articles/the-10-longest-place-names-in-the-world.html
+        https://github.com/viewflow/django-fsm
     """
 
     class Meta:
@@ -103,6 +123,7 @@ class JobApplication(models.Model):
         max_length=85,
     )
 
+    # This is the state in which the job is located, not the `state` of the FSM
     state = models.CharField(
         max_length=85,
     )
@@ -220,6 +241,22 @@ class JobApplication(models.Model):
         with transaction.atomic():
             self.save()
 
+    @transition(field=status, source="interview_scheduled",
+                target="interview_complete")
+    def complete_interview(self) -> None:
+        """
+        Set application's state to 'interview_complete and set updated_date to
+        current date
+        """
+        today = date.today()
+        if today < self.interview_date:
+            raise IncompatibleDateException(
+                "Interview cannot be completed before scheduled date"
+            )
+        self.updated_date = today
+        with transaction.atomic():
+            self.save()
+
 
 class JobReference(models.Model):
     """Person working for a compnay who may serve as a reference
@@ -275,5 +312,5 @@ class JobReference(models.Model):
         :return: String representing Job reference object
         """
         reference = "Reference: {} at {}\n".format(self.name, self.company.name)
-        created = "Creaded By: {}".format(self.creator.username)
+        created = "Created By: {}".format(self.creator.username)
         return reference + created

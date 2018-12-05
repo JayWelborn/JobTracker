@@ -44,7 +44,7 @@ class Company(models.Model):
         editable=False,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Create a human-readable string representation of a company
         """
@@ -266,7 +266,7 @@ class JobReference(models.Model):
         editable=False,
     )
 
-    def __str__(self):
+    def __str__(self) -> str:
         """
         Provide a human-readable string representation of object. String
         contains name of person to use as a reference, along with the name
@@ -274,6 +274,6 @@ class JobReference(models.Model):
 
         :return: String representing Job reference object
         """
-        return "Reference: {} at {}\nCreated By: {}".format(self.name,
-                                                            self.company.name,
-                                                            self.creator.username)
+        reference = "Reference: {} at {}\n".format(self.name, self.company.name)
+        created = "Creaded By: {}".format(self.creator.username)
+        return reference + created

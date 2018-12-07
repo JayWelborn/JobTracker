@@ -245,7 +245,7 @@ class JobApplication(models.Model):
                 target="interview_complete")
     def complete_interview(self) -> None:
         """
-        Set application's state to 'interview_complete and set updated_date to
+        Set application's state to 'interview_complete' and set updated_date to
         current date
         """
         today = date.today()
@@ -254,6 +254,17 @@ class JobApplication(models.Model):
                 "Interview cannot be completed before scheduled date"
             )
         self.updated_date = today
+        with transaction.atomic():
+            self.save()
+
+    @transition(field=status, source="interview_complete",
+                target="offer_received")
+    def receive_offer(self) -> None:
+        """
+        Set application's state to 'offer_received' and set updated_date to
+        current date.
+        """
+        self.updated_date = date.today()
         with transaction.atomic():
             self.save()
 

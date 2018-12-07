@@ -114,7 +114,10 @@ class JobApplicationTests(TestCase):
 
         test_attempt_to_complete_interview_before_scheduled: Attempting to
             complete an interview before its scheduled date should raise an
-            IllegalDateExcetion
+            IncompatibleDateException
+
+        test_offer_received: Receiving an offer should set the status to
+            "offer_received" and set the updated_date to today
 
         test_submitted_to_rejected: Models should be able to transition from
             'submitted' to 'rejected' status. Reason message provided in reject
@@ -134,6 +137,11 @@ class JobApplicationTests(TestCase):
             scheduling an interview should set rejected reason, rejected_state,
             and rejected_date to provided reason, interview_scheduled, and
             today, respectively. interview_date should remain unchanged
+
+        test_interview_complete_to_rejected: Rejecting application after
+            completing interview should set rejected_reason, rejected_state,
+            and rejected_date to provided reason, interview_complete, and today,
+            respectively.
 
     References:
         https://github.com/viewflow/django-fsm
@@ -286,6 +294,26 @@ class JobApplicationTests(TestCase):
                 "Interview cannot be completed before scheduled date"
             )
 
+    def test_offer_received(self):
+        """
+        Should set status to 'offer received' and set 'updated_date' to today
+        """
+        # Move object through state pattern
+        self.jobapp.send_followup()
+        self.jobapp.phone_screen()
+        self.jobapp.updated_date = self.dates[5]
+        self.jobapp.save()
+        # Schedule interview for today (should be acceptable)
+        self.jobapp.schedule_interview(self.dates[0])
+        self.jobapp.complete_interview()
+
+        # Call jobapp.offer_received
+        self.jobapp.receive_offer()
+        # Check updated_date
+        self.assertEqual(self.jobapp.updated_date, self.dates[0])
+        # Check status
+        self.assertEqual(self.jobapp.status, "offer_received")
+
     def test_submitted_to_rejected(self):
         """
         Calling 'reject' method should set status to 'rejected' and set
@@ -344,7 +372,7 @@ class JobApplicationTests(TestCase):
 
     def test_interview_scheduled_to_rejected(self):
         """
-        Calling 'reject should set status to 'rejected' and set rejected date
+        Calling 'reject' should set status to 'rejected' and set rejected date
         to today. rejected_state should be 'interview_scheduled'
         """
         # Advance application to 'interview_scheduled' status
@@ -364,3 +392,26 @@ class JobApplicationTests(TestCase):
         self.assertEqual(self.jobapp.rejected_date, self.dates[0])
         self.assertEqual(self.jobapp.updated_date, self.dates[0])
         self.assertEqual(self.jobapp.interview_date, next_week)
+
+    def test_interview_complete_to_rejected(self):
+        """
+        Calling 'reject' should set status to 'rejected' and set rejected date
+        to today. rejected_state should be 'interview_scheduled'
+        """
+        # Advance application to the 'interview_complete' state
+        self.jobapp.send_followup()
+        self.jobapp.phone_screen()
+        self.jobapp.schedule_interview(self.dates[0])
+        self.jobapp.complete_interview()
+
+        # Reject application
+        self.jobapp.reject("Your Interview Sucked and you're stupid.")
+        # Check status and rejected reason
+        self.assertEqual(self.jobapp.status, "rejected")
+        self.assertEqual(self.jobapp.rejected_reason,
+                         "Your Interview Sucked and you're stupid.")
+        # Check previous state
+        self.assertEqual(self.jobapp.rejected_state, "interview_complete")
+        # Check model's date fields
+        self.assertEqual(self.jobapp.rejected_date, self.dates[0])
+        self.assertEqual(self.jobapp.updated_date, self.dates[0])

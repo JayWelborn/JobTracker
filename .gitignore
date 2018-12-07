@@ -5,6 +5,10 @@ node_modules/
 .pyc
 __pycache__/
 
+# django stuff
+*.log
+migrations/
+
 #ide stuff
 .idea/
 

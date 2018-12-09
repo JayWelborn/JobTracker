@@ -264,7 +264,12 @@ class JobApplication(models.Model):
         Set application's state to 'offer_received' and set updated_date to
         current date.
         """
-        self.updated_date = date.today()
+        today = date.today()
+        if today < self.submitted_date:
+            raise IncompatibleDateException(
+                "Offer cannot predate Application Submission"
+            )
+        self.updated_date = today
         with transaction.atomic():
             self.save()
 

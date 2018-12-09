@@ -1,6 +1,7 @@
 from datetime import date, timedelta
 
 from django.test import TestCase
+from django_fsm import TransitionNotAllowed
 
 from jobapplication.models import Company, JobApplication, JobReference
 from jobapplication.exceptions import IncompatibleDateException
@@ -142,6 +143,9 @@ class JobApplicationTests(TestCase):
             completing interview should set rejected_reason, rejected_state,
             and rejected_date to provided reason, interview_complete, and today,
             respectively.
+
+        test_invalid_transitions: Attempting state transitions that aren't
+            explicitly allowed should result in TransitionNotAllowed exception
 
     References:
         https://github.com/viewflow/django-fsm
@@ -415,3 +419,186 @@ class JobApplicationTests(TestCase):
         # Check model's date fields
         self.assertEqual(self.jobapp.rejected_date, self.dates[0])
         self.assertEqual(self.jobapp.updated_date, self.dates[0])
+
+    def test_invalid_transitions(self):
+        """
+        Attempting to make any transitions other than those explicitly allowed
+        should fail.
+        """
+        # TransitionNotAllowed string
+        tnl = "Can't switch from state {} using method {}"
+        # Submitted to phone_screen
+        try:
+            self.jobapp.phone_screen()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'submitted'", "'phone_screen'"))
+        # Submitted to interview_scheduled
+        try:
+            self.jobapp.schedule_interview()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'submitted'", "'schedule_interview'"))
+        # Submitted to interview_complete
+        try:
+            self.jobapp.complete_interview()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'submitted'", "'complete_interview'"))
+        # Submitted to offer_received
+        try:
+            self.jobapp.receive_offer()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'submitted'",
+                                        "'receive_offer'"))
+
+        # Followup_sent to followup_sent
+        self.jobapp.send_followup()
+        try:
+            self.jobapp.send_followup()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'followup_sent'",
+                                        "'send_followup'"))
+        # Followup_sent to interview_scheduled
+        try:
+            self.jobapp.schedule_interview()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'followup_sent'",
+                                        "'schedule_interview'"))
+        # Followup_sent to interview_complete
+        try:
+            self.jobapp.complete_interview()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'followup_sent'",
+                                        "'complete_interview'"))
+        # Followup_sent to offer_received
+        try:
+            self.jobapp.receive_offer()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'followup_sent'",
+                                        "'receive_offer'"))
+
+        # Phone_screen to followup_sent
+        self.jobapp.phone_screen()
+        try:
+            self.jobapp.send_followup()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'phone_screen_complete'",
+                                        "'send_followup'"))
+        # Phone screen to phone screen
+        try:
+            self.jobapp.phone_screen()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'phone_screen_complete'",
+                                        "'phone_screen'"))
+        # Phone screen to interview_complete
+        try:
+            self.jobapp.complete_interview()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'phone_screen_complete'",
+                                        "'complete_interview'"))
+        # Phone screen to offer_received
+        try:
+            self.jobapp.receive_offer()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'phone_screen_complete'",
+                                        "'receive_offer'"))
+
+        # Interview scheduled to followup_sent
+        self.jobapp.schedule_interview(self.dates[0])
+        try:
+            self.jobapp.send_followup()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'interview_scheduled'",
+                                        "'send_followup'"))
+        # Interview scheduled to phone screen
+        try:
+            self.jobapp.phone_screen()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'interview_scheduled'",
+                                        "'phone_screen'"))
+        # Interview scheduled to interview_complete
+        try:
+            self.jobapp.schedule_interview()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'interview_scheduled'",
+                                        "'schedule_interview'"))
+        # Interview scheduled to offer_received
+        try:
+            self.jobapp.receive_offer()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'interview_scheduled'",
+                                        "'receive_offer'"))
+
+        # Interview complete to followup_sent
+        self.jobapp.complete_interview()
+        try:
+            self.jobapp.send_followup()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'interview_complete'",
+                                        "'send_followup'"))
+        # Interview complete to phone screen
+        try:
+            self.jobapp.phone_screen()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'interview_complete'",
+                                        "'phone_screen'"))
+        # Interview complete to interview_scheduled
+        try:
+            self.jobapp.schedule_interview(self.dates[0])
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'interview_complete'",
+                                        "'schedule_interview'"))
+        # Interview complete to interview complete
+        try:
+            self.jobapp.complete_interview()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'interview_complete'",
+                                        "'complete_interview'"))
+
+        # Offer received to followup_sent
+        self.jobapp.receive_offer()
+        try:
+            self.jobapp.send_followup()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'offer_received'",
+                                        "'send_followup'"))
+        # Offer received to phone screen
+        try:
+            self.jobapp.phone_screen()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'offer_received'",
+                                        "'phone_screen'"))
+        # Offer received to interview_scheduled
+        try:
+            self.jobapp.schedule_interview(self.dates[0])
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'offer_received'",
+                                        "'schedule_interview'"))
+        # Offer received to interview complete
+        try:
+            self.jobapp.receive_offer()
+        except TransitionNotAllowed as t:
+            self.assertEqual(str(t),
+                             tnl.format("'offer_received'",
+                                        "'receive_offer'"))

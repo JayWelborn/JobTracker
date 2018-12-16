@@ -185,9 +185,6 @@ class JobApplication(models.Model):
         self.rejected_reason = reason
         self.rejected_date = today
         self.rejected_state = self.status
-        # avoid concurrent db operations
-        with transaction.atomic():
-            self.save()
 
     @transition(field=status, source="submitted", target="followup_sent")
     def send_followup(self) -> None:
@@ -202,9 +199,6 @@ class JobApplication(models.Model):
                 "Followup date cannot predate submission"
             )
         self.updated_date = today
-        # avoid concurrent db operations
-        with transaction.atomic():
-            self.save()
 
     @transition(field=status, source="followup_sent",
                 target="phone_screen_complete")
@@ -219,9 +213,7 @@ class JobApplication(models.Model):
                 "Phone Screen date cannot predate submission"
             )
         self.updated_date = today
-        # avoid concurrent db operations
-        with transaction.atomic():
-            self.save()
+
 
     @transition(field=status, source="phone_screen_complete",
                 target="interview_scheduled")
@@ -237,9 +229,7 @@ class JobApplication(models.Model):
             )
         self.updated_date = today
         self.interview_date = interview_date
-        # avoid concurrent db operations
-        with transaction.atomic():
-            self.save()
+
 
     @transition(field=status, source="interview_scheduled",
                 target="interview_complete")

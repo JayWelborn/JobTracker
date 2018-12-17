@@ -173,7 +173,7 @@ class JobApplication(models.Model):
     def reject(self, reason: str) -> None:
         """
         Set application's state to 'Rejected'.
-        :param: reason
+        :param reason:
             Reason application was rejected
         """
         # Raise exception if dates are suspicious

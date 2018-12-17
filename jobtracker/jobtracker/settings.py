@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'auth_extension',
     'jobapplication',
     'frontend',
     'rest_framework',
@@ -130,3 +131,9 @@ STATIC_URL = '/static/'
 # Media files (images uploaded via admin page/authenticated users)
 # https://docs.djangoproject.com/en/1.10/ref/settings/#std:setting-MEDIA_ROOT
 MEDIA_URL = '/media/'
+
+# Rest API Settings
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
+}

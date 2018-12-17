@@ -15,12 +15,19 @@ Including another URLconf
 """
 from django.conf import settings
 from django.conf.urls.static import static
-from django.contrib import admin
 from django.urls import include, path
 
+from jobtracker.admin import jobtracker_admin_site
+from jobtracker.routers import DefaultRouter
+from auth_extension.routers import auth_extension_router
+
+
+router = DefaultRouter()
+router.extend(auth_extension_router)
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    # path('api/jobapplication', include('jobapplication.urls')),
+    path('admin/', jobtracker_admin_site.urls),
+    path('api/', include(router.urls)),
     path('', include('frontend.urls')),
 ]
 

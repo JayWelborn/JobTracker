@@ -16,10 +16,12 @@ class CompanySerializer(serializers.HyperlinkedModelSerializer):
 
     References:
     """
-    # creator = serializers.HyperlinkedRelatedField(
-    #     many=False, view_name='user-detail', read_only=True
-    # )
+    creator = serializers.HyperlinkedRelatedField(
+        many=False,
+        # view_name='user-detail',
+        read_only=True
+    )
 
     class Meta:
         model = Company
-        fields = ('id', 'name', 'website', )#'creator')
+        fields = ('id', 'name', 'website', 'creator')

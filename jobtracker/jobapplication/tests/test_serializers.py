@@ -63,5 +63,3 @@ class CompanySerializerTests(APITestCase):
 
         for field in company_fields:
             self.assertIn(field, serializer.data)
-
-        #print(serializer.data['creator'])

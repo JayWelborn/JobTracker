@@ -9,6 +9,9 @@ class CompanySerializer(serializers.HyperlinkedModelSerializer):
     """Serializer for Company model.
 
     Fields:
+        creator: User who created this company object
+
+    Metaclass Fields:
         model: model to be serialized
         fields: fields to include in serialization
 
@@ -18,10 +21,13 @@ class CompanySerializer(serializers.HyperlinkedModelSerializer):
     """
     creator = serializers.HyperlinkedRelatedField(
         many=False,
-        # view_name='user-detail',
+        view_name='user-detail',
         read_only=True
     )
 
     class Meta:
         model = Company
-        fields = ('id', 'name', 'website', 'creator')
+        fields = (
+            'id', 'name', 'website', 'creator',
+            'job_applications', 'references'
+        )

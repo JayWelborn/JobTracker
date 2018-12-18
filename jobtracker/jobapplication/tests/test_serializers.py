@@ -25,13 +25,17 @@ class CompanySerializerTests(APITestCase):
         company_serializes_expected_fields: Serializer should return key-value
             pairs for all of the fields on the model. Values for missing fields
             should be empty.
+        update_company_name: Serializer should update object in database with
+            new name when "update" method is called.
+        update_company_website: Serializer should update object in database with
+            new website when "update" method is called.
     """
 
     USERNAME = "lazertagR0cks"
     PASSWORD = "IOPU@#Y$MbSDF"
     USER_EMAIL = "lazertag@hotness.mailcom"
     COMP_NAME = "TESTNAME"
-    COMP_SITE = "www.testsite.com"
+    COMP_SITE = "https://www.testsite.com"
 
     def setUp(self):
         """
@@ -70,6 +74,60 @@ class CompanySerializerTests(APITestCase):
 
         for field in company_fields:
             self.assertIn(field, serializer.data)
+
+    def test_update_company_name(self):
+        """
+        Serializer should update object in database when "update" method is
+        called.
+        """
+        creator = self.company.creator
+        id = self.company.id
+        name = self.company.name
+        new_name = "New Name"
+        website = self.company.website
+
+        update = {
+            'name': new_name,
+        }
+
+        serializer = CompanySerializer(self.company, data=update, partial=True,
+                                       context=self.context)
+        self.assertTrue(serializer.is_valid())
+        updated_company = serializer.save()
+
+        self.assertTrue(updated_company)
+        self.assertEqual(new_name, updated_company.name)
+        self.assertEqual(creator, updated_company.creator)
+        self.assertEqual(id, updated_company.id)
+        self.assertEqual(website, updated_company.website)
+        self.assertNotEqual(name, updated_company.name)
+
+    def test_update_company_website(self):
+        """
+        Serializer should update object in database when "update" method is
+        called.
+        """
+        creator = self.company.creator
+        id = self.company.id
+        name = self.company.name
+        website = self.company.website
+        new_website = "https://www.new.com"
+
+        update = {
+            'website': new_website,
+        }
+
+        serializer = CompanySerializer(self.company, data=update, partial=True,
+                                       context=self.context)
+        self.assertTrue(serializer.is_valid())
+        updated_company = serializer.save()
+
+        self.assertTrue(updated_company)
+        self.assertEqual(new_website, updated_company.website)
+        self.assertNotEqual(website, updated_company.website)
+        self.assertEqual(creator, updated_company.creator)
+        self.assertEqual(id, updated_company.id)
+        self.assertEqual(name, updated_company.name)
 
 
 class JobReferenceSerializerTests(APITestCase):

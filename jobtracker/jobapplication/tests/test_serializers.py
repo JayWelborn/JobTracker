@@ -213,6 +213,13 @@ class JobReferenceSerializerTests(APITestCase):
             creator=self.user,
         )[0]
 
+        self.reference = JobReference.objects.get_or_create(
+            creator=self.user,
+            company=self.company,
+            name=self.REF_NAME,
+            email=self.REF_EMAIL
+        )[0]
+
         self.context = {'request': None}
 
     def tearDown(self):

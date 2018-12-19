@@ -29,6 +29,9 @@ class CompanySerializerTests(APITestCase):
             new name when "update" method is called.
         update_company_website: Serializer should update object in database with
             new website when "update" method is called.
+        update_invalid_data: Serializer.is_valid() should return false if data
+            is invalid. Invalid data includes non-url values for website, and
+            empty company names.
     """
 
     USERNAME = "lazertagR0cks"
@@ -108,7 +111,7 @@ class CompanySerializerTests(APITestCase):
         called.
         """
         creator = self.company.creator
-        id = self.company.id
+        company_id = self.company.id
         name = self.company.name
         website = self.company.website
         new_website = "https://www.new.com"
@@ -126,8 +129,44 @@ class CompanySerializerTests(APITestCase):
         self.assertEqual(new_website, updated_company.website)
         self.assertNotEqual(website, updated_company.website)
         self.assertEqual(creator, updated_company.creator)
-        self.assertEqual(id, updated_company.id)
+        self.assertEqual(company_id, updated_company.id)
         self.assertEqual(name, updated_company.name)
+
+    def test_update_invalid_data(self):
+        """
+        Serializer.is_valid() should return false if data is invalid.
+        Invalid data includes non-url values for website, and empty company
+        names.
+        """
+
+        # Test invalid website URL
+        invalid_website = 'notAUrl'
+
+        update = {
+            'website': invalid_website
+        }
+
+        serializer = CompanySerializer(self.company, data=update, partial=True,
+                                       context=self.context)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('website', serializer.errors)
+        website_error = serializer.errors['website'][0]
+        self.assertEqual(website_error.code, 'invalid')
+        self.assertEqual(str(website_error), 'Enter a valid URL.')
+
+        # Test empty company name
+        invalid_company = ""
+
+        update = {
+            'name': invalid_company
+        }
+
+        serializer = CompanySerializer(self.company, data=update, partial=True,
+                                       context=self.context)
+        self.assertFalse(serializer.is_valid())
+        name_error = serializer.errors['name'][0]
+        self.assertEqual(name_error.code, 'blank')
+        self.assertEqual(str(name_error), 'This field may not be blank.')
 
 
 class JobReferenceSerializerTests(APITestCase):

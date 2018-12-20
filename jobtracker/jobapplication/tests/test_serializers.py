@@ -187,6 +187,8 @@ class JobReferenceSerializerTests(APITestCase):
         tearDown: Empty database between tests
         jobreference_serializes_expected_fields: Serializer should return
             key-value pairs for all fields on the model.
+        update_name: Attempting to update name with string up to 128 characters
+            should succeed. Empty string or 129+ characters should fail.
     """
 
     USERNAME = "lazertagR0cks"
@@ -238,14 +240,85 @@ class JobReferenceSerializerTests(APITestCase):
         Serializer should return JSON object with keys for every field on the
         model.
         """
-        reference = JobReference.objects.get_or_create(
-            creator=self.user,
-            company=self.company,
-            name=self.REF_NAME,
-            email=self.REF_EMAIL
-        )[0]
-        reference_fields = [f.name for f in reference._meta.get_fields()]
-        serializer = JobReferenceSerializer(reference, context=self.context)
+        reference_fields = [f.name for f in self.reference._meta.get_fields()]
+        serializer = JobReferenceSerializer(self.reference,
+                                            context=self.context)
 
         for field in reference_fields:
             self.assertIn(field, serializer.data)
+
+    def test_update_name(self):
+        """
+        If updating name field to any string up to 128 characters, is_valid()
+        should return True.
+        Attempting to update to an empty string or to > 128 character should
+        return false.
+        """
+        valid = "Valid name"
+        longest = "poiuytrewqwertyuiopoiuytrewqwert" + \
+                  "poiuytrewqwertyuiopoiuytrewqwert" + \
+                  "poiuytrewqwertyuiopoiuytrewqwert" + \
+                  "poiuytrewqwertyuiopoiuytrewqwert"
+        self.assertEqual(len(longest), 128)
+        too_long = longest + "!"
+        empty = ""
+
+        # test the valid names
+        for name in [valid, longest]:
+            data = {
+                'name': name
+            }
+            serializer = JobReferenceSerializer(self.reference, data=data,
+                                                partial=True,
+                                                context=self.context)
+            self.assertTrue(serializer.is_valid())
+            updated_reference = serializer.save()
+            self.assertEqual(name, updated_reference.name)
+
+        # test invalid names
+        for index, name in enumerate([too_long, empty]):
+            data = {
+                'name': name
+            }
+            serializer = JobReferenceSerializer(self.reference, data=data,
+                                                partial=True,
+                                                context=self.context)
+            self.assertFalse(serializer.is_valid())
+            self.assertNotEqual(name, updated_reference.name)
+            error = serializer.errors['name'][0]
+            self.assertEqual(error.code, ['max_length', 'blank'][index])
+
+    def test_update_email(self):
+        """
+        Updating email field with valid email address should succeed. Empty
+        emails should fail. Blank emails are allowed, and should succeed.
+        """
+        valid = "newemail@em.ail"
+        empty = ""
+        invalid_no_ampersand = "not.an.email"
+        invalid_no_tld = "email@gmail"
+
+        # Test valid email
+        for index, email in enumerate([valid, empty]):
+            data = {
+                'email': email
+            }
+            serializer = JobReferenceSerializer(self.reference, data=data,
+                                                partial=True,
+                                                context=self.context)
+            self.assertTrue(serializer.is_valid())
+            updated_reference = serializer.save()
+            self.assertEqual(email, updated_reference.email)
+
+        # test invalid email
+        invalids = [invalid_no_ampersand, invalid_no_tld]
+        for index, email in enumerate(invalids):
+            data = {
+                'email': email
+            }
+            serializer = JobReferenceSerializer(self.reference, data=data,
+                                                partial=True,
+                                                context=self.context)
+            self.assertFalse(serializer.is_valid())
+            error = serializer.errors['email'][0]
+            self.assertTrue(error.code)

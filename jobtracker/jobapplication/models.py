@@ -115,6 +115,13 @@ class JobApplication(models.Model):
         on_delete=models.CASCADE
     )
 
+    creator = models.ForeignKey(
+        User,
+        related_name="job_applications",
+        on_delete=models.CASCADE,
+        editable=False,
+    )
+
     position = models.CharField(
         max_length=128,
     )
@@ -128,15 +135,9 @@ class JobApplication(models.Model):
         max_length=85,
     )
 
+    # This is the FSM's `state`
     status = FSMField(
         default="submitted"
-    )
-
-    creator = models.ForeignKey(
-        User,
-        related_name="job_applications",
-        on_delete=models.CASCADE,
-        editable=False,
     )
 
     submitted_date = models.DateField(
@@ -214,7 +215,6 @@ class JobApplication(models.Model):
             )
         self.updated_date = today
 
-
     @transition(field=status, source="phone_screen_complete",
                 target="interview_scheduled")
     def schedule_interview(self, interview_date: date) -> None:
@@ -229,7 +229,6 @@ class JobApplication(models.Model):
             )
         self.updated_date = today
         self.interview_date = interview_date
-
 
     @transition(field=status, source="interview_scheduled",
                 target="interview_complete")

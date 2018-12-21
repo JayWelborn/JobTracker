@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 
 from rest_framework.test import APITestCase
 
-from ..models import Company, JobReference
+from ..models import Company, JobReference, JobApplication
 from ..serializers import CompanySerializer, JobReferenceSerializer
 
 
@@ -189,6 +189,9 @@ class JobReferenceSerializerTests(APITestCase):
             key-value pairs for all fields on the model.
         update_name: Attempting to update name with string up to 128 characters
             should succeed. Empty string or 129+ characters should fail.
+        update_email: Updating email field with valid email address should
+            succeed. Invalid emails should fail. Blank emails are allowed, and
+            should succeed.
     """
 
     USERNAME = "lazertagR0cks"
@@ -290,7 +293,7 @@ class JobReferenceSerializerTests(APITestCase):
 
     def test_update_email(self):
         """
-        Updating email field with valid email address should succeed. Empty
+        Updating email field with valid email address should succeed. Invalid
         emails should fail. Blank emails are allowed, and should succeed.
         """
         valid = "newemail@em.ail"
@@ -322,3 +325,64 @@ class JobReferenceSerializerTests(APITestCase):
             self.assertFalse(serializer.is_valid())
             error = serializer.errors['email'][0]
             self.assertTrue(error.code)
+
+
+class JobApplicationSerializerTests(APITestCase):
+    """Tests for the Job Application Serializer
+
+    Fields:
+        USERNAME: username to include in tests
+        PASSWORD: password to include in tests
+        USER_EMAIL: user email address to include in tests
+        COMP_NAME: company name to include in tests
+        COMP_SITE: company website to include in tests
+
+    Methods:
+        setUp: Create clean data between tests
+        tearDown: Empty database between tests
+
+    References:
+
+    """
+
+    USERNAME = "lazertagR0cks"
+    PASSWORD = "IOPU@#Y$MbSDF"
+    USER_EMAIL = "lazertag@hotness.mailcom"
+    COMP_NAME = "TESTNAME"
+    COMP_SITE = "www.testsite.com"
+    REF_NAME = "Jimothy"
+    REF_EMAIL = "jimothy@jim.othy"
+
+    def setUp(self):
+        """
+        Create clean test data between tests
+        """
+        self.user = User.objects.create_user(
+            username=self.USERNAME,
+            email=self.USER_EMAIL,
+            password=self.PASSWORD,
+        )
+
+        self.company = Company.objects.get_or_create(
+            name=self.COMP_NAME,
+            website=self.COMP_SITE,
+            creator=self.user,
+        )[0]
+
+        self.reference = JobReference.objects.get_or_create(
+            creator=self.user,
+            company=self.company,
+            name=self.REF_NAME,
+            email=self.REF_EMAIL
+        )[0]
+
+        self.context = {'request': None}
+
+    def tearDown(self):
+        """
+        Empty database between tests
+        """
+        for user in User.objects.all():
+            user.delete()
+        self.assertFalse(Company.objects.all())
+        self.assertFalse(JobApplication.objects.all())

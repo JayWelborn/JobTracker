@@ -73,3 +73,41 @@ class JobReferenceSerializer(serializers.HyperlinkedModelSerializer):
         fields = (
             'id', 'name', 'email', 'company', 'creator',
         )
+
+
+class JobApplicationSerializer(serializers.HyperlinkedModelSerializer):
+    """Serializer for JobApplication model.
+
+    Fields:
+        company: Company application is directed towards
+        creator: User who created this Job Application
+
+
+    Metaclass Fields:
+        model: Model to serialize (Job Application)
+        fields: fields to include in serialization
+
+    Methods:
+
+    References:
+    """
+
+    company = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name='company-detail',
+        read_only=True
+    )
+
+    creator = serializers.HyperlinkedRelatedField(
+        many=False,
+        view_name='user-detail',
+        read_only=True
+    )
+
+    class Meta:
+        model = JobApplication
+        fields = (
+            'id', 'company', 'creator', 'position', 'city', 'state', 'status',
+            'submitted_date', 'updated_date', 'interview_date', 'rejected_date',
+            'rejected_reason', 'rejected_state'
+        )

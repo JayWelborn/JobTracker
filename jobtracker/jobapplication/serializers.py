@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db import transaction
 
 from .models import Company, JobApplication, JobReference
 
@@ -35,8 +36,8 @@ class CompanySerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Company
         fields = (
-            'id', 'name', 'website', 'creator',
-            'job_applications', 'references'
+            'url', 'id', 'name', 'website', 'creator', 'job_applications',
+            'references'
         )
 
 
@@ -65,13 +66,14 @@ class JobReferenceSerializer(serializers.HyperlinkedModelSerializer):
     company = serializers.HyperlinkedRelatedField(
         many=False,
         view_name='company-detail',
-        read_only=True
+        read_only=False,
+        queryset=Company.objects.all(),
     )
 
     class Meta:
         model = JobReference
         fields = (
-            'id', 'name', 'email', 'company', 'creator',
+            'url', 'id', 'name', 'email', 'company', 'creator',
         )
 
 
@@ -88,15 +90,12 @@ class JobApplicationSerializer(serializers.HyperlinkedModelSerializer):
         fields: fields to include in serialization
 
     Methods:
+        is_valid: Perform validation sp
 
     References:
     """
 
-    company = serializers.HyperlinkedRelatedField(
-        many=False,
-        view_name='company-detail',
-        read_only=True
-    )
+    company = CompanySerializer(many=False, read_only=False)
 
     creator = serializers.HyperlinkedRelatedField(
         many=False,
@@ -104,10 +103,51 @@ class JobApplicationSerializer(serializers.HyperlinkedModelSerializer):
         read_only=True
     )
 
+    update_method = serializers.CharField(max_length=18, required=False)
+
     class Meta:
         model = JobApplication
         fields = (
-            'id', 'company', 'creator', 'position', 'city', 'state', 'status',
-            'submitted_date', 'updated_date', 'interview_date', 'rejected_date',
-            'rejected_reason', 'rejected_state'
+            'url', 'id', 'company', 'creator', 'position', 'city', 'state',
+            'status', 'submitted_date', 'updated_date', 'interview_date',
+            'rejected_date', 'rejected_reason', 'rejected_state',
+            'update_method',
         )
+
+    def validate_update_method(self, value):
+        """
+        Update methods that match transition methods in the JobApplication
+        class are valid. Others are not.
+
+        If update_method is `schedule_interview`, serializer must also include
+        an `interview_date`
+
+        If update_method is `reject`, serializer must also include a
+        `rejected_reason`
+        """
+        if value not in JobApplication.VALID_UPDATE_METHODS:
+            raise serializers.ValidationError("Invalid update method.")
+
+        if value == 'schedule_interview' and \
+                'interview_date' not in self.initial_data:
+            raise serializers.ValidationError(
+                "Cannot schedule interview without date")
+
+        if value == 'reject' and 'rejected_reason' not in self.initial_data:
+            raise serializers.ValidationError(
+                "Cannot reject application without reason")
+
+        return value
+
+    def update(self, instance, validated_data):
+        """
+        This is where the magic happens. If `update_method` not provided,
+        update normally. If `update_method` is provided, perform the model
+        method with the corresponding name on the instance of JobApplication.
+
+        :param instance:
+        :param validated_data:
+        :return:
+        """
+
+        # TODO write this method

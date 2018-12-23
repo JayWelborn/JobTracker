@@ -1,9 +1,13 @@
+from datetime import date, timedelta
+
 from django.contrib.auth.models import User
 
 from rest_framework.test import APITestCase
 
 from ..models import Company, JobReference, JobApplication
-from ..serializers import CompanySerializer, JobReferenceSerializer
+from ..serializers import (CompanySerializer, JobReferenceSerializer,
+                           JobApplicationSerializer,
+                           )
 
 
 class CompanySerializerTests(APITestCase):
@@ -181,6 +185,8 @@ class JobReferenceSerializerTests(APITestCase):
         USER_EMAIL: user email address to include in tests
         COMP_NAME: company name to include in tests
         COMP_SITE: company website to include in tests
+        REF_NAME: reference name
+        REF_EMAIL: reference email
 
     Methods:
         setUp: Create clean test data
@@ -337,9 +343,23 @@ class JobApplicationSerializerTests(APITestCase):
         COMP_NAME: company name to include in tests
         COMP_SITE: company website to include in tests
 
+
     Methods:
         setUp: Create clean data between tests
         tearDown: Empty database between tests
+        new_application_serializes_expected_fields: A newly created job
+            application should serialize the following fields:
+                company, creator, position, city, state, status, submitted_date,
+                updated_date.
+            All other fields should contain None
+        validate_update_simple_methods: update methods should be considered
+            valid if they are in the JobApplication model's VALID_UPDATE_METHODS
+            set.
+        validate_update_method_schedule_interview: If update_method is
+            `schedule_interview`, serializer must also include an
+            `interview_date`
+        valid_update_reject: If update_method is `reject`, serializer must also
+            include a `rejected_reason`
 
     References:
 
@@ -352,6 +372,9 @@ class JobApplicationSerializerTests(APITestCase):
     COMP_SITE = "www.testsite.com"
     REF_NAME = "Jimothy"
     REF_EMAIL = "jimothy@jim.othy"
+    JOB_POSITION = "Software Engineer"
+    JOB_CITY = "Raleigh"
+    JOB_STATE = "NC"
 
     def setUp(self):
         """
@@ -376,6 +399,14 @@ class JobApplicationSerializerTests(APITestCase):
             email=self.REF_EMAIL
         )[0]
 
+        self.application = JobApplication.objects.get_or_create(
+            creator=self.user,
+            company=self.company,
+            position=self.JOB_POSITION,
+            city=self.JOB_CITY,
+            state=self.JOB_STATE
+        )[0]
+
         self.context = {'request': None}
 
     def tearDown(self):
@@ -386,3 +417,83 @@ class JobApplicationSerializerTests(APITestCase):
             user.delete()
         self.assertFalse(Company.objects.all())
         self.assertFalse(JobApplication.objects.all())
+
+    def test_new_application_serializes_expected_fields(self):
+        """
+        A newly created job application should serialize the following fields:
+        company, creator, position, city, state, status, submitted_date,
+        updated_date.
+
+        All other fields should contain None
+        """
+        application_fields = [f.name for f in
+                              self.application._meta.get_fields()]
+        serializer = JobApplicationSerializer(self.application,
+                                              context=self.context)
+
+        # Ensure all expected fields are present
+        for field in application_fields:
+            self.assertIn(field, serializer.data)
+
+        # Ensure fields expected to be empty are null
+        for field in ['interview_date', 'rejected_date', 'rejected_reason',
+                      'rejected_state']:
+            self.assertIsNone(serializer.data[field])
+
+    def test_validate_update_method_simple_methods(self):
+        """
+        Update methods are only valid if they are included in the JobApplication
+        model's VALID_UPDATE_METHODS set.
+        """
+        simple_valid_methods = ['send_followup', 'phone_screen',
+                                'complete_interview', 'receive_offer']
+        for method in simple_valid_methods:
+            data = {
+                'update_method': method
+            }
+            serializer = JobApplicationSerializer(
+                self.application, data=data, partial=True, context=self.context
+            )
+            self.assertTrue(serializer.is_valid())
+
+    def test_validate_update_method_schedule_interview(self):
+        """
+        If update_method is `schedule_interview`, serializer must also include
+            an `interview_date`
+        """
+        # Invalid data
+        data = {
+            'update_method': 'schedule_interview'
+        }
+        serializer = JobApplicationSerializer(self.application, data=data,
+                                              partial=True,
+                                              context=self.context)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(set(serializer.errors.keys()), {'update_method'})
+
+        # Valid data
+        data['interview_date'] = date.today() + timedelta(days=3)
+        serializer = JobApplicationSerializer(self.application, data=data,
+                                              partial=True,
+                                              context=self.context)
+        self.assertTrue(serializer.is_valid())
+
+    def test_validate_update_method_reject(self):
+        """
+        If update_method is `reject`, serializer must also include a
+        `rejected_reason`
+        """
+        data = {
+            'update_method': 'reject'
+        }
+        serializer = JobApplicationSerializer(self.application, data=data,
+                                              partial=True,
+                                              context=self.context)
+        self.assertFalse(serializer.is_valid())
+        self.assertEqual(set(serializer.errors.keys()), {'update_method'})
+
+        data['rejected_reason'] = "Ghosted. No Clue"
+        serializer = JobApplicationSerializer(self.application, data=data,
+                                              partial=True,
+                                              context=self.context)
+        self.assertTrue(serializer.is_valid())

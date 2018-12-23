@@ -52,6 +52,64 @@ class Company(models.Model):
                                                     self.creator.username)
 
 
+class JobReference(models.Model):
+    """Person working for a compnay who may serve as a reference
+
+    Fields:
+        id: randomly generated unique id (PK)
+        Name: name of individual
+        Email: individual's email address
+
+    Methods:
+        __str__: provide human-readable if object is printed
+
+    References:
+    """
+
+    class Meta:
+        verbose_name = "Job Reference"
+        verbose_name_plural = "Job References"
+
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid4,
+        editable=False
+    )
+
+    name = models.CharField(
+        max_length=128
+    )
+
+    email = models.EmailField(
+        blank=True,
+    )
+
+    company = models.ForeignKey(
+        Company,
+        related_name="references",
+        on_delete=models.CASCADE,
+    )
+
+    creator = models.ForeignKey(
+        User,
+        related_name="references",
+        on_delete=models.CASCADE,
+        editable=False,
+    )
+
+    def __str__(self) -> str:
+        """
+        Provide a human-readable string representation of object. String
+        contains name of person to use as a reference, along with the name
+        of the company they work for.
+
+        :return: String representing Job reference object
+        """
+        reference = "Reference: {} at {}\n".format(self.name, self.company.name)
+        created = "Created By: {}".format(self.creator.username)
+        return reference + created
+
+
 class JobApplication(models.Model):
     """Model for a Job Application
 
@@ -73,6 +131,9 @@ class JobApplication(models.Model):
     Any state can lead to the 'rejected' state, but otherwise the progression is
     linear. The model's methods define the side effects of each transition,
     including how the database should be updated on each state change.
+
+    Class Variables:
+        VALID_UPDATE_METHODS: set containing strings of valid update methods
 
     Fields:
         id:                 randomly generated unique id (PK in database)
@@ -98,6 +159,10 @@ class JobApplication(models.Model):
         https://www.worldatlas.com/articles/the-10-longest-place-names-in-the-world.html
         https://github.com/viewflow/django-fsm
     """
+
+    VALID_UPDATE_METHODS = {'reject', 'send_followup', 'phone_screen',
+                            'schedule_interview', 'complete_interview',
+                            'receive_offer'}
 
     class Meta:
         verbose_name = "Job Application"
@@ -261,61 +326,3 @@ class JobApplication(models.Model):
         self.updated_date = today
         with transaction.atomic():
             self.save()
-
-
-class JobReference(models.Model):
-    """Person working for a compnay who may serve as a reference
-
-    Fields:
-        id: randomly generated unique id (PK)
-        Name: name of individual
-        Email: individual's email address
-
-    Methods:
-        __str__: provide human-readable if object is printed
-
-    References:
-    """
-
-    class Meta:
-        verbose_name = "Job Reference"
-        verbose_name_plural = "Job References"
-
-    id = models.UUIDField(
-        primary_key=True,
-        default=uuid4,
-        editable=False
-    )
-
-    name = models.CharField(
-        max_length=128
-    )
-
-    email = models.EmailField(
-        blank=True,
-    )
-
-    company = models.ForeignKey(
-        Company,
-        related_name="references",
-        on_delete=models.CASCADE,
-    )
-
-    creator = models.ForeignKey(
-        User,
-        related_name="references",
-        on_delete=models.CASCADE,
-        editable=False,
-    )
-
-    def __str__(self) -> str:
-        """
-        Provide a human-readable string representation of object. String
-        contains name of person to use as a reference, along with the name
-        of the company they work for.
-
-        :return: String representing Job reference object
-        """
-        reference = "Reference: {} at {}\n".format(self.name, self.company.name)
-        created = "Created By: {}".format(self.creator.username)
-        return reference + created

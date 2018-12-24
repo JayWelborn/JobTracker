@@ -105,14 +105,25 @@ class JobApplicationSerializer(serializers.HyperlinkedModelSerializer):
 
     update_method = serializers.CharField(max_length=18, required=False)
 
+    valid_update_methods = serializers.SerializerMethodField()
+
     class Meta:
         model = JobApplication
         fields = (
             'url', 'id', 'company', 'creator', 'position', 'city', 'state',
             'status', 'submitted_date', 'updated_date', 'interview_date',
             'rejected_date', 'rejected_reason', 'rejected_state',
-            'update_method',
+            'update_method', 'valid_update_methods',
         )
+
+    def get_valid_update_methods(self, instance):
+        """
+        Get a list of possible valid update methods for the current object
+        instance. This list will depend on the current state of the object.
+        :param instance: Instance of object being serialized
+        :return: List of valid update methods
+        """
+        return [x.name for x in instance.get_available_status_transitions()]
 
     def validate_update_method(self, value):
         """
@@ -125,8 +136,8 @@ class JobApplicationSerializer(serializers.HyperlinkedModelSerializer):
         If update_method is `reject`, serializer must also include a
         `rejected_reason`
         """
-        if value not in JobApplication.VALID_UPDATE_METHODS:
-            raise serializers.ValidationError("Invalid update method.")
+        if value not in self.get_valid_update_methods(self.instance):
+            raise serializers.ValidationError("Invalid Transition Method")
 
         if value == 'schedule_interview' and \
                 'interview_date' not in self.initial_data:
@@ -143,11 +154,23 @@ class JobApplicationSerializer(serializers.HyperlinkedModelSerializer):
         """
         This is where the magic happens. If `update_method` not provided,
         update normally. If `update_method` is provided, perform the model
-        method with the corresponding name on the instance of JobApplication.
+        method with the corresponding name on the instance of JobApplication,
+        then continue updating.
 
-        :param instance:
-        :param validated_data:
-        :return:
+        :param instance: Instance to update
+        :param validated_data: Validated JSON data
+        :return: updated object instance
         """
-
-        # TODO write this method
+        method_name = validated_data.get('update_method')
+        interview_date = validated_data.get('interview_date')
+        rejected_reason = validated_data.get('rejected_reason')
+        if method_name:
+            update_method = getattr(instance, method_name)
+            if method_name == 'schedule_interview' and interview_date:
+                update_method(interview_date)
+            elif method_name == 'reject' and rejected_reason:
+                update_method(rejected_reason)
+            else:
+                update_method()
+        return super(JobApplicationSerializer, self).update(instance,
+                                                            validated_data)

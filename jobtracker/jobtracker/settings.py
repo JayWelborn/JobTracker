@@ -25,10 +25,35 @@ SECRETS = os.path.join(PROJECT_DIR, 'secrets')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
-with open(os.path.join(SECRETS, 'django-secret.key'), 'r') as f:
-            SECRET_KEY = f.readline().strip()
+if os.getenv('BUILD_ON_TRAVIS', None):
+    SECRET_KEY = os.environ('SECRET_KEY')
+    DEBUG = False
+    TEMPLATE_DEBUG = True
 
-DEBUG = True
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': 'travis_ci_db',
+            'USER': 'travis',
+            'PASSWORD': '',
+            'HOST': '127.0.0.1',
+        }
+    }
+else:
+    with open(os.path.join(SECRETS, 'django-secret.key'), 'r') as f:
+        SECRET_KEY = f.readline().strip()
+
+    DEBUG = True
+
+    # Database
+    # https://docs.djangoproject.com/en/2.1/ref/settings/#databases
+
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+        }
+    }
 
 ALLOWED_HOSTS = [
     'localhost',
@@ -79,17 +104,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'jobtracker.wsgi.application'
-
-
-# Database
-# https://docs.djangoproject.com/en/2.1/ref/settings/#databases
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
-    }
-}
 
 
 # Password validation

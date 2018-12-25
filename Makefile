@@ -1,10 +1,7 @@
 SHELL := /bin/bash
 
-start:
-	source ./venv/bin/activate
-
-test: start
+test:
 	python jobtracker/manage.py test jobtracker/
 
-run: start
+run:
 	python manage.py runserver

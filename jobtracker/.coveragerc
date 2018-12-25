@@ -1,0 +1,17 @@
+[run]
+branch = True
+
+omit =
+    # omit venv
+    */venv/*
+    # omit pycache directories
+    */__pycache__/*
+    # omit migrations
+    */migrations/*
+    # omit the tests themselves
+    */test*
+    # omit manage.py
+    manage.py
+
+[html]
+directory = cov/html

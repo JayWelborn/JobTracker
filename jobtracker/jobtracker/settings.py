@@ -32,11 +32,8 @@ if os.getenv('BUILD_ON_TRAVIS', None):
 
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.mysql',
-            'NAME': 'travis_ci_db',
-            'USER': 'travis',
-            'PASSWORD': '',
-            'HOST': '127.0.0.1',
+            'ENGINE': 'django.db.backends.sqlite3l',
+            'NAME': os.path.join(BASE_DIR, 'travis_db.sqlite3'),
         }
     }
 else:

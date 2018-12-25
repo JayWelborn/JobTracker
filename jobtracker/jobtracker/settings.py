@@ -26,7 +26,7 @@ SECRETS = os.path.join(PROJECT_DIR, 'secrets')
 # See https://docs.djangoproject.com/en/2.1/howto/deployment/checklist/
 
 if os.getenv('BUILD_ON_TRAVIS', None):
-    SECRET_KEY = os.environ('SECRET_KEY')
+    SECRET_KEY = os.environ['SECRET_KEY']
     DEBUG = False
     TEMPLATE_DEBUG = True
 

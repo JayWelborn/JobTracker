@@ -1,4 +1,5 @@
 #JobTracker 
+
 [![Build Status](https://travis-ci.com/JayWelborn/JobTracker.svg?token=r3JkfftxGDq6gFug9hF1&branch=master)](https://travis-ci.com/JayWelborn/JobTracker)
 [![codecov](https://codecov.io/gh/JayWelborn/JobTracker/branch/master/graph/badge.svg)](https://codecov.io/gh/JayWelborn/JobTracker)
 

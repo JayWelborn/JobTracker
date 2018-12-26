@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 test:
 	coverage run jobtracker/manage.py test jobtracker/
-	coverage html --fail-under=90
+	coverage report
 
 run:
 	python jobtracker/manage.py runserver

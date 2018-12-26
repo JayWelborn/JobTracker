@@ -55,7 +55,7 @@ class UserProfile(models.Model):
 
     def save(self, *args, **kwargs):
         """
-        Slugifies username automatically when UserProfile is saved
+        Slugifies username automatically wen UserProfile is saved
         """
         self.slug = slugify(self.user.username)
         super(UserProfile, self).save(*args, **kwargs)

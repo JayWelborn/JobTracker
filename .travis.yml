@@ -13,7 +13,8 @@ install:
   - pip install -r requirements.txt
 
 # run tests
-script: make test
+script:
+  - make test
 
 # generate coverage report
 after_success:

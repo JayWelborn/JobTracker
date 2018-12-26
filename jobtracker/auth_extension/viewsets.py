@@ -1,5 +1,5 @@
 from django.contrib.auth.models import User
-from rest_framework import permissions, viewsets
+from rest_framework import permissions, viewsets, mixins
 
 from auth_extension.models import UserProfile
 from auth_extension.permissions import IsSelfOrAdmin, IsUserOrReadOnly
@@ -21,7 +21,11 @@ class UserViewset(viewsets.ModelViewSet):
     permission_classes = (IsSelfOrAdmin,)
 
 
-class UserProfileViewset(viewsets.ModelViewSet):
+class UserProfileViewset(mixins.RetrieveModelMixin,
+                         mixins.UpdateModelMixin,
+                         mixins.DestroyModelMixin,
+                         mixins.ListModelMixin,
+                         viewsets.GenericViewSet):
     """
     Viewset for User Profiles.
     """
@@ -31,5 +35,4 @@ class UserProfileViewset(viewsets.ModelViewSet):
     permission_classes = (permissions.IsAuthenticatedOrReadOnly,
                           IsUserOrReadOnly)
 
-    def perform_create(self, serializer):
-        serializer.save(creator=self.request.user)
+

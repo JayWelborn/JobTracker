@@ -255,7 +255,6 @@ class UserViewsetTests(APITestCase):
         force_authenticate(username_request, user=user)
 
         response = self.detailview(username_request, pk=pk, partial=True)
-        # pdb.set_trace()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['username'], new_username['username'])
         self.assertEqual(response.data['email'], user.email)
@@ -452,7 +451,6 @@ class UserProfileViewsetTests(APITestCase):
         self.factory = APIRequestFactory()
         self.listview = UserProfileViewset.as_view({
             'get': 'list',
-            'post': 'create'
         })
         self.detailview = UserProfileViewset.as_view({
             'get': 'retrieve',
@@ -465,8 +463,6 @@ class UserProfileViewsetTests(APITestCase):
         """
         Clear Test Database.
         """
-        for profile in UserProfile.objects.all():
-            profile.delete()
         for user in User.objects.all():
             user.delete()
 
@@ -487,10 +483,10 @@ class UserProfileViewsetTests(APITestCase):
             self.assertEqual(results[index]['slug'], profile.slug)
 
         user = self.users[0]
-        id = user.profile.id
-        detail_url = reverse('userprofile-detail', args=[id])
+        user_id = user.profile.id
+        detail_url = reverse('userprofile-detail', args=[user_id])
         request = self.factory.get(detail_url)
-        response = self.detailview(request, pk=id)
+        response = self.detailview(request, pk=user_id)
         data = response.data
         self.assertEqual(response.status_code, 200)
         self.assertEqual(data['slug'], user.username)
@@ -616,3 +612,23 @@ class UserProfileViewsetTests(APITestCase):
         force_authenticate(request, staff)
         response = self.detailview(request, pk=pk)
         self.assertEqual(response.status_code, 204)
+
+    def test_user_creates_profile(self):
+        """
+        Test the perform_create viewset method
+        """
+        new_user = User.objects.create_user("beans", "beans@gmail.com",
+                                            "ilovebeans")
+        data = {
+        }
+        url = reverse('userprofile-list')
+        request = self.factory.post(
+            url, data=data,
+        )
+        force_authenticate(request, new_user)
+        response = self.listview(request)
+        self.assertEqual(response.status_code, 405)
+        self.assertIn('detail', response.data)
+        self.assertEquals(str(response.data['detail']),
+                          'Method "POST" not allowed.')
+

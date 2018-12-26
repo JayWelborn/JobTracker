@@ -15,11 +15,11 @@ omit =
     */test*
 
     # omit django stuff
-    jobtracker/manage.py
-    jobtracker/settings.py
+    */manage.py
+    */settings.py
 
     # init.py
     */__init__.py
 
 [html]
-directory = cov/html
+directory = coverage/html

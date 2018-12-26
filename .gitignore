@@ -26,4 +26,4 @@ webpack-stats.json
 
 # coverage report
 .coverage
-cov/
+coverage/

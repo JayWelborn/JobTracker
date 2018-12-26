@@ -51,7 +51,7 @@ class UserProfile(models.Model):
         """
         Calling __str__ will return something legible.
         """
-        return self.user.username
+        return "Profile for: {}".format(self.user.username)
 
     def save(self, *args, **kwargs):
         """

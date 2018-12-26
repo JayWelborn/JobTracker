@@ -4,14 +4,20 @@ branch = True
 omit =
     # omit venv
     */venv/*
+
     # omit pycache directories
     */__pycache__/*
+
     # omit migrations
     */migrations/*
+
     # omit the tests themselves
     */test*
-    # omit manage.py
+
+    # omit django stuff
     jobtracker/manage.py
+    jobtracker/settings.py
+
     # init.py
     */__init__.py
 

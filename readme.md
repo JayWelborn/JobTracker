@@ -6,6 +6,8 @@
 This is a simple job application tracking system, designed to save time spent
 keeping track of the status of multiple applications.
 
+***WORK IN PROGRESS***
+
 ## About
 
 JobTracker uses the [Finite State Machine](https://en.wikipedia.org/wiki/Finite-state_machine)

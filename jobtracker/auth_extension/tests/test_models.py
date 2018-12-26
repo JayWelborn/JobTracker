@@ -75,3 +75,9 @@ class UserProfileModelTests(TestCase):
         """
         self.assertEqual(self.test_profile.get_absolute_url(),
                          '/api/profiles/{}/'.format(self.test_profile.id))
+
+    def test_str(self):
+        """
+        Calling str() on profile instance should return this user's username.
+        """
+        self.assertEqual("Profile for: test one", str(self.test_profile))

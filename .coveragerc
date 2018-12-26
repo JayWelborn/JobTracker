@@ -11,7 +11,9 @@ omit =
     # omit the tests themselves
     */test*
     # omit manage.py
-    manage.py
+    jobtracker/manage.py
+    # init.py
+    */__init__.py
 
 [html]
 directory = cov/html

@@ -1,6 +1,8 @@
 from datetime import date, timedelta
 
+from django.contrib.auth.models import User
 from django.test import TestCase
+
 from django_fsm import TransitionNotAllowed
 
 from jobapplication.models import Company, JobApplication, JobReference
@@ -147,6 +149,10 @@ class JobApplicationTests(TestCase):
         test_invalid_transitions: Attempting state transitions that aren't
             explicitly allowed should result in TransitionNotAllowed exception
 
+        test_invalid_dates: Attempting any state transition that would alter the
+            updated_date to be before the submitted_date should raise an
+            IncompatibleDateException.
+
     References:
         https://github.com/viewflow/django-fsm
 
@@ -178,6 +184,13 @@ class JobApplicationTests(TestCase):
         # Ensure fixture object was created in the pas
         self.jobapp.submitted_date = self.dates[6]
         self.jobapp.save()
+
+    def tearDown(self):
+        """
+        Empty database between tests
+        """
+        for user in User.objects.all():
+            user.delete()
 
     def test_create_new_model(self):
         """
@@ -602,3 +615,28 @@ class JobApplicationTests(TestCase):
             self.assertEqual(str(t),
                              tnl.format("'offer_received'",
                                         "'receive_offer'"))
+
+    def test_invalid_dates(self):
+        """
+        Attempting any state transition that would alter the updated_date to be
+        before the submitted_date should raise an IncompatibleDateException.
+        """
+        # Check reject and send_followup
+        self.assertEqual(self.jobapp.status, "submitted")
+        self.jobapp.submitted_date = date.today() + timedelta(days=7)
+        self.assertRaises(IncompatibleDateException, self.jobapp.send_followup)
+        self.assertRaises(IncompatibleDateException, self.jobapp.reject, "none")
+
+        # Check phone screen
+        self.jobapp.submitted_date = date.today()
+        self.jobapp.send_followup()
+        self.jobapp.submitted_date = date.today() + timedelta(days=7)
+        self.assertRaises(IncompatibleDateException, self.jobapp.phone_screen)
+
+        # Check receive_offer
+        self.jobapp.submitted_date = date.today()
+        self.jobapp.phone_screen()
+        self.jobapp.schedule_interview(date.today())
+        self.jobapp.complete_interview()
+        self.jobapp.submitted_date = date.today() + timedelta(days=7)
+        self.assertRaises(IncompatibleDateException, self.jobapp.receive_offer)

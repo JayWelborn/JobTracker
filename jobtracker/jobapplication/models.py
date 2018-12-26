@@ -308,8 +308,6 @@ class JobApplication(models.Model):
                 "Interview cannot be completed before scheduled date"
             )
         self.updated_date = today
-        with transaction.atomic():
-            self.save()
 
     @transition(field=status, source="interview_complete",
                 target="offer_received")
@@ -324,5 +322,3 @@ class JobApplication(models.Model):
                 "Offer cannot predate Application Submission"
             )
         self.updated_date = today
-        with transaction.atomic():
-            self.save()

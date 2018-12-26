@@ -4,6 +4,7 @@ branch = True
 omit =
     # omit venv
     */venv/*
+    */virtualenv/*
 
     # omit pycache directories
     */__pycache__/*

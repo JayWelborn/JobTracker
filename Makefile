@@ -1,7 +1,9 @@
 SHELL := /bin/bash
 
 test:
-	python jobtracker/manage.py test jobtracker/
+	coverage run jobtracker/manage.py test jobtracker/
+	rm coverage.svg
+	coverage-badge -o coverage.svg
 
 run:
-	python manage.py runserver
+	python jobtracker/manage.py runserver

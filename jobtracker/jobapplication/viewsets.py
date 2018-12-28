@@ -1,14 +1,11 @@
 from rest_framework import permissions, viewsets
 
-from djangorestframework_fsm.viewset_mixins import get_drf_fsm_mixin
-
 from jobapplication.models import Company, JobReference, JobApplication
+from jobapplication.permissions import IsSelfOrAdmin, IsOwnerOrAdmin
 from jobapplication.serializers import (CompanySerializer,
                                         JobReferenceSerializer,
                                         JobApplicationSerializer,
                                         )
-
-DRF_FSM_MIXIN = get_drf_fsm_mixin(JobApplication, fieldname='status')
 
 
 class CompanyViewset(viewsets.ModelViewSet):
@@ -25,7 +22,7 @@ class CompanyViewset(viewsets.ModelViewSet):
 
     queryset = Company.objects.all().order_by('name', )
     serializer_class = CompanySerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrAdmin)
 
     def perform_create(self, serializer):
         """
@@ -44,12 +41,13 @@ class JobReferenceViewset(viewsets.ModelViewSet):
     Fields:
         queryset: list of job references ordered by name
         serializer_class: serializer to use to represent job references
-        permission_classes: restrictions on who can accessjob reference endpoints
+        permission_classes: restrictions on who can access job reference
+            endpoints
     """
 
     queryset = JobReference.objects.all().order_by('name', )
     serializer_class = JobReferenceSerializer
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrAdmin,)
 
     def perform_create(self, serializer):
         """
@@ -60,7 +58,7 @@ class JobReferenceViewset(viewsets.ModelViewSet):
         serializer.save(creator=self.request.user)
 
 
-class JobApplicationViewset(DRF_FSM_MIXIN, viewsets.ModelViewSet):
+class JobApplicationViewset(viewsets.ModelViewSet):
     """Viewset for JobApplication objects.
 
     JobApplication views should only be accessible by authenticated users.
@@ -78,3 +76,4 @@ class JobApplicationViewset(DRF_FSM_MIXIN, viewsets.ModelViewSet):
 
     queryset = JobApplication.objects.all().order_by('submitted_date')
     serializer_class = JobApplicationSerializer
+    permission_classes = (permissions.IsAuthenticated, IsSelfOrAdmin,)

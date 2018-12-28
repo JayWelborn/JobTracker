@@ -209,7 +209,7 @@ class UserViewsetTests(APITestCase):
 
     def test_get_with_pk(self):
         """
-        GET requests that include a Primay Key should retrieve detailed
+        GET requests that include a Primary Key should retrieve detailed
         information about a single object.
         """
         user = self.users[0]

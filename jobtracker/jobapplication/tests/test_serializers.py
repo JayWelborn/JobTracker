@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from django.contrib.auth.models import User
 
 from rest_framework.test import APITestCase
+from rest_framework.serializers import ValidationError
 
 from ..models import Company, JobReference, JobApplication
 from ..serializers import (CompanySerializer, JobReferenceSerializer,
@@ -481,7 +482,7 @@ class JobApplicationSerializerTests(APITestCase):
         for method in ['reject', 'send_followup']:
             self.assertIn(method, serializer.data['valid_update_methods'])
 
-    def test_validate_update_method_simple_methods(self):
+    def test_validate_update_simple_methods(self):
         """
         Update methods are only valid if they are included in the JobApplication
         model's VALID_UPDATE_METHODS set.
@@ -521,6 +522,8 @@ class JobApplicationSerializerTests(APITestCase):
             an `interview_date`
         """
         # Invalid data
+        self.application.send_followup()
+        self.application.phone_screen()
         data = {
             'update_method': 'schedule_interview'
         }
@@ -532,8 +535,6 @@ class JobApplicationSerializerTests(APITestCase):
 
         # Valid data
         data['interview_date'] = date.today() + timedelta(days=3)
-        self.application.send_followup()
-        self.application.phone_screen()
         serializer = JobApplicationSerializer(self.application, data=data,
                                               partial=True,
                                               context=self.context)
@@ -584,6 +585,17 @@ class JobApplicationSerializerTests(APITestCase):
                                               context=self.context,
                                               partial=True)
         self.assertTrue(serializer.is_valid())
+
+        # Check 'invalid' methods
+        data['update_method'] = 'phone_screen'
+        data['rejected_reason'] = None
+        serializer = JobApplicationSerializer(self.application, data=data,
+                                              context=self.context,
+                                              partial=True)
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('update_method', serializer.errors)
+        self.assertEqual('Invalid Transition Method',
+                         str(serializer.errors['update_method'][0]))
 
         # Send followup
         data['update_method'] = 'send_followup'

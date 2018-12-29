@@ -18,11 +18,28 @@ class CompanyViewset(viewsets.ModelViewSet):
         serializer_class: serializer to use to represent companies
         permission_classes: restrictions on who can access company endpoints
 
+     Methods:
+        get_queryset: Return a list of Companies created by the current user. If
+            they are a superuser, return all Company records.
+        perform_create: Assign the user associated with the current request to
+            the Company being created before saving.
+
     """
 
-    queryset = Company.objects.all().order_by('name', )
     serializer_class = CompanySerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrAdmin)
+
+    def get_queryset(self):
+        """
+        Return a list of companies created by the current user. If they are a
+        superuser, return all Company records
+        :return: Queryset of Companies
+        """
+        if self.request.user.is_superuser:
+            return Company.objects.all().order_by('name')
+
+        return Company.objects.filter(
+            creator=self.request.user).order_by('name')
 
     def perform_create(self, serializer):
         """
@@ -39,13 +56,18 @@ class JobReferenceViewset(viewsets.ModelViewSet):
     JobReference views should only be accessible by authenticated users
 
     Fields:
-        queryset: list of job references ordered by name
         serializer_class: serializer to use to represent job references
         permission_classes: restrictions on who can access job reference
             endpoints
+
+    Methods:
+        get_queryset: Only get records created by the current user if they are
+            a normal user. If they are a superuser, return all records.
+        perform_create: Assign currently authenticated user as the object's
+            creator
     """
 
-    queryset = JobReference.objects.all().order_by('name', )
+    queryset = JobReference.objects.all().order_by('name')
     serializer_class = JobReferenceSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrAdmin,)
 

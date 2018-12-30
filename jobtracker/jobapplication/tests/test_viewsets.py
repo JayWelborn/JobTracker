@@ -10,6 +10,8 @@ from jobapplication.viewsets import CompanyViewset
 
 # Status codes
 STATUS_OK = 200
+STATUS_CREATED = 201
+STATUS_BAD_REQUEST = 400
 STATUS_FORBIDDEN = 403
 STATUS_NOT_FOUND = 404
 
@@ -25,6 +27,7 @@ class CompanyViewsetTests(APITestCase):
         tearDown: Empty test database
         unauthenticated_get: Unauthenticated GET requests should return 403
             Forbidden
+
         normal_user_get_other: User should not be able to GET a company created
             by another user. Should return 404 so user doesn't know object
             exists at all.
@@ -37,7 +40,21 @@ class CompanyViewsetTests(APITestCase):
         superuser_get_list: Superuser GET on listview should return all Company
             objects in the database, regardless of creator
 
-    TODO - superuser GET, all user types POST, PUT, PATCH, DELETE
+        authenticated_post: Regardless of user type, POST requests should create
+            a new object if they contain complete, correct data.
+        invalid_post: If the data is incomplete or incorrect, the POST should
+            fail with status 400 BAD REQUEST.
+        unauthenticated_post: Unauthenticated users attempting POST request
+            should return 403
+
+        authenticated_put: Correctly formed PUT requests should completely
+            overwrite old Company object data.
+        normal_user_put_other: Non superuser should not be able to send PUT
+            requests to url of object created by another user
+        invalid put: Incomplete PUT requests or PUT requests with invalid data
+            should fail with status 400 Bad Request
+
+    TODO - all user types PATCH, DELETE
 
     """
 
@@ -237,3 +254,205 @@ class CompanyViewsetTests(APITestCase):
             act_url = ret_comp['creator']
             exp_url = DOMAIN + reverse('user-detail', args=[db_comp.creator_id])
             self.assertEqual(act_url, exp_url)
+
+    def test_authenticated_post(self):
+        """
+        Regardless of user type, POST requests should create a new object if
+        they contain complete, correct data.
+        """
+        # Try POST with normal user
+        url = reverse('company-list')
+        complete_data = {
+            'name': 'Complete Data',
+            'website': 'https://www.complete.com',
+        }
+        request = self.factory.post(url, complete_data)
+        force_authenticate(request, user=self.non_super_user)
+        response = self.listview(request)
+        self.assertEqual(response.status_code, STATUS_CREATED)
+        company = Company.objects.get(name='Complete Data')
+        self.assertEqual(company.name, complete_data['name'])
+        self.assertEqual(company.website, complete_data['website'])
+        self.assertEqual(company.creator_id, self.non_super_user.id)
+
+        # Try POST with superuser
+        complete_data = {
+            'name': 'Superuser Complete',
+            'website': 'https://www.superuser.complete.com'
+        }
+        request = self.factory.post(url, complete_data)
+        force_authenticate(request, user=self.super_user)
+        response = self.listview(request)
+        self.assertEqual(response.status_code, STATUS_CREATED)
+        company = Company.objects.get(name='Superuser Complete')
+        self.assertEqual(company.name, complete_data['name'])
+        self.assertEqual(company.website, complete_data['website'])
+        self.assertEqual(company.creator_id, self.super_user.id)
+
+    def test_invalid_post(self):
+        """
+        If the data is incomplete or incorrect, the POST should fail with status
+        400 BAD REQUEST
+        """
+        # Missing name
+        url = reverse('company-list')
+        missing_name = {
+            'website': 'https://www.missingname.com'
+        }
+        request = self.factory.post(url, missing_name)
+        force_authenticate(request, user=self.non_super_user)
+        response = self.listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+
+        request = self.factory.post(url, missing_name)
+        force_authenticate(request, user=self.super_user)
+        response = self.listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+
+        # Missing website
+        missing_website = {
+            'name': 'Missing Website'
+        }
+        request = self.factory.post(url, missing_website)
+        force_authenticate(request, user=self.super_user)
+        response = self.listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+
+        request = self.factory.post(url, missing_website)
+        force_authenticate(request, user=self.non_super_user)
+        response = self.listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+
+        # Incorrect url
+        incorrect_url = {
+            'name': 'Valid Name',
+            'website': 'notaurl'
+        }
+        request = self.factory.post(url, incorrect_url)
+        force_authenticate(request, user=self.super_user)
+        response = self.listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+
+        request = self.factory.post(url, incorrect_url)
+        force_authenticate(request, user=self.non_super_user)
+        response = self.listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+
+    def test_unauthenticated_post(self):
+        """
+        Unauthenticated POST requests should be rejected with 403 FORBIDDEN
+        """
+        url = reverse('company-list')
+        complete_data = {
+            'name': 'Complete Data',
+            'website': 'https://www.complete.com',
+        }
+        request = self.factory.post(url, complete_data)
+        response = self.listview(request)
+        self.assertEqual(response.status_code, STATUS_FORBIDDEN)
+
+    def test_authenticated_put(self):
+        """
+        Correctly formed PUT requests should completely overwrite old Company
+        object data.
+        """
+        # Normal user PUT own object
+        pk = self.normal_company.pk
+        url = reverse('company-detail', args=[pk])
+        data = {
+            'name': 'Updated Company',
+            'website': 'https://www.updated.com'
+        }
+        request = self.factory.put(url, data)
+        force_authenticate(request, self.non_super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        company = Company.objects.filter(creator=self.non_super_user)[0]
+        self.assertEqual(company.name, data['name'])
+        self.assertEqual(company.website, data['website'])
+        self.assertEqual(company.creator_id, self.non_super_user.id)
+
+        # Superuser PUT own object
+        pk = self.super_user_company.pk
+        url = reverse('company-detail', args=[pk])
+        data = {
+            'name': 'Updated Company',
+            'website': 'https://www.updated.com'
+        }
+        request = self.factory.put(url, data)
+        force_authenticate(request, self.super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        company = Company.objects.filter(creator=self.super_user)[0]
+        self.assertEqual(company.name, data['name'])
+        self.assertEqual(company.website, data['website'])
+        self.assertEqual(company.creator_id, self.super_user.id)
+
+        # Superuser PUT other object
+        pk = self.normal_company.pk
+        url = reverse('company-detail', args=[pk])
+        data = {
+            'name': 'Updated Company Again',
+            'website': 'https://www.updatedagain.com'
+        }
+        request = self.factory.put(url, data)
+        force_authenticate(request, self.super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        company = Company.objects.filter(creator=self.non_super_user)[0]
+        self.assertEqual(company.name, data['name'])
+        self.assertEqual(company.website, data['website'])
+        self.assertEqual(company.creator_id, self.non_super_user.id)
+
+    def test_normal_user_put_other(self):
+        """
+        Non superuser should not be able to send PUT requests to url of object
+        created by another user.
+        """
+        pk = self.super_user_company.pk
+        url = reverse('company-detail', args=[pk])
+        data = {
+            'name': 'Updated Company',
+            'website': 'https://www.updated.com'
+        }
+        request = self.factory.put(url, data)
+        force_authenticate(request, self.non_super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_NOT_FOUND)
+        company = Company.objects.filter(creator=self.super_user)[0]
+        self.assertNotEqual(company.name, data['name'])
+        self.assertNotEqual(company.website, data['website'])
+        self.assertNotEqual(company.creator_id, self.non_super_user.id)
+
+    def test_invalid_put(self):
+        """
+        Incomplete PUT requests or PUT requests with invalid data should fail
+        with status 400 Bad Request
+        """
+        pk = self.super_user_company.pk
+        url = reverse('company-detail', args=[pk])
+        missing_name = {
+            'website': 'https://www.missingname.com'
+        }
+        request = self.factory.put(url, missing_name)
+        force_authenticate(request, self.super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+
+        missing_website = {
+            'name': 'Missing Website'
+        }
+        request = self.factory.put(url, missing_website)
+        force_authenticate(request, self.super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+
+        invalid_website = {
+            'name': 'Invalid Website',
+            'website': 'notaurl'
+        }
+        request = self.factory.put(url, invalid_website)
+        force_authenticate(request, self.super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+

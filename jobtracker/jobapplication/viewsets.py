@@ -1,7 +1,7 @@
 from rest_framework import permissions, viewsets
 
 from jobapplication.models import Company, JobReference, JobApplication
-from jobapplication.permissions import IsSelfOrAdmin, IsOwnerOrAdmin
+from jobapplication.permissions import IsOwnerOrAdmin
 from jobapplication.serializers import (CompanySerializer,
                                         JobReferenceSerializer,
                                         JobApplicationSerializer,
@@ -98,4 +98,4 @@ class JobApplicationViewset(viewsets.ModelViewSet):
 
     queryset = JobApplication.objects.all().order_by('submitted_date')
     serializer_class = JobApplicationSerializer
-    permission_classes = (permissions.IsAuthenticated, IsSelfOrAdmin,)
+    permission_classes = (permissions.IsAuthenticated, IsOwnerOrAdmin,)

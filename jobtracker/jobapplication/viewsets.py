@@ -71,6 +71,18 @@ class JobReferenceViewset(viewsets.ModelViewSet):
     serializer_class = JobReferenceSerializer
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrAdmin,)
 
+    def get_queryset(self):
+        """
+        Return a list of references created by the current user. If they are a
+        superuser, return all JobReference records
+        :return: Queryset of JobReferences
+        """
+        if self.request.user.is_superuser:
+            return JobReference.objects.all().order_by('name')
+
+        return JobReference.objects.filter(
+            creator=self.request.user).order_by('name')
+
     def perform_create(self, serializer):
         """
        Add currently authenticated user as creator of this JobReference object

@@ -11,6 +11,7 @@ from jobapplication.viewsets import CompanyViewset
 # Status codes
 STATUS_OK = 200
 STATUS_CREATED = 201
+STATUS_NO_CONTENT = 204
 STATUS_BAD_REQUEST = 400
 STATUS_FORBIDDEN = 403
 STATUS_NOT_FOUND = 404
@@ -53,8 +54,26 @@ class CompanyViewsetTests(APITestCase):
             requests to url of object created by another user
         invalid put: Incomplete PUT requests or PUT requests with invalid data
             should fail with status 400 Bad Request
+        unauthenticated_put: PUT requests without authentication should return
+            403 Forbidden.
 
-    TODO - all user types PATCH, DELETE
+        valid_patch: Normal users should be able to PATCH their own objects.
+            Superusers should be able to PATCH all objects.
+        normal_user_patch_other: Normal users should not be able to PATCH
+            objects made by others. These objects should not be queryable, and
+            so should return 404 Not Found.
+        invalid_patch: PATCH requests with invalid data should fail with status
+            400 Bad Request
+
+        user_deletes_own:Both normal user and superuser should be able to delete
+            objects they created.
+        superuser_delete_other: Superuser should be able to DELETE objects
+            created by others
+        normal_user_delete_other: Non-superusers should not be able to DELETE
+            objects created by others. Requests should return 404 Not Found, as
+            those items won't be in that user's queryset
+        unauthenticated_user_delete: Unauthenticated requests to DELETE anything
+            should return 403 Forbidden.
 
     """
 
@@ -456,3 +475,155 @@ class CompanyViewsetTests(APITestCase):
         response = self.detailview(request, pk=pk)
         self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
 
+    def test_unauthenticated_put(self):
+        """
+        PUT requests without authentication should return 403 Forbidden.
+        """
+        pk = self.normal_company.pk
+        url = reverse('company-detail', args=[pk])
+        data = {
+            'name': 'Updated Company',
+            'website': 'https://www.updated.com'
+        }
+        request = self.factory.put(url, data)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_FORBIDDEN)
+
+    def test_valid_patch(self):
+        """
+        Normal users should be able to PATCH their own objects. Superusers
+        should be able to PATCH all objects.
+        """
+        # Normal user PATCH own object
+        pk = self.normal_company.pk
+        url = reverse('company-detail', args=[pk])
+        data = {
+            'name': 'Patched Company',
+        }
+        request = self.factory.patch(url, data)
+        force_authenticate(request, self.non_super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        company = Company.objects.filter(creator=self.non_super_user)[0]
+        self.assertEqual(company.name, data['name'])
+        self.assertEqual(company.creator_id, self.non_super_user.id)
+
+        # Superuser PATCH own object
+        pk = self.super_user_company.pk
+        url = reverse('company-detail', args=[pk])
+        data = {
+            'website': 'https://www.updated.com'
+        }
+        request = self.factory.patch(url, data)
+        force_authenticate(request, self.super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        company = Company.objects.filter(creator=self.super_user)[0]
+        self.assertEqual(company.website, data['website'])
+        self.assertEqual(company.creator_id, self.super_user.id)
+
+        # Superuser PATCH other object
+        pk = self.normal_company.pk
+        url = reverse('company-detail', args=[pk])
+        data = {
+            'name': 'Patched Company Again',
+        }
+        request = self.factory.patch(url, data)
+        force_authenticate(request, self.super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        company = Company.objects.filter(creator=self.non_super_user)[0]
+        self.assertEqual(company.name, data['name'])
+        self.assertEqual(company.creator_id, self.non_super_user.id)
+
+    def test_normal_user_patch_other(self):
+        """
+        Normal users should not be able to PATCH objects made by others. These
+        objects should not be queryable, and so should return 404 Not Found.
+        """
+        pk = self.super_user_company.pk
+        url = reverse('company-detail', args=[pk])
+        data = {
+            'name': 'Patched Company',
+        }
+        request = self.factory.patch(url, data)
+        force_authenticate(request, self.non_super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_NOT_FOUND)
+        company = Company.objects.filter(creator=self.super_user)[0]
+        self.assertNotEqual(company.name, data['name'])
+        self.assertNotEqual(company.creator_id, self.non_super_user.id)
+
+    def test_invalid_patch(self):
+        """
+        PATCH requests with invalid data should fail with status 400 Bad Request
+        """
+        pk = self.super_user_company.pk
+        url = reverse('company-detail', args=[pk])
+        invalid_website = {
+            'website': 'notaurl'
+        }
+        request = self.factory.patch(url, invalid_website)
+        force_authenticate(request, self.super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+
+    def test_user_deletes_own(self):
+        """
+        Both normal user and superuser should be able to DELETE objects they
+        created.
+        """
+        # Superuser
+        pk = self.super_user_company.pk
+        url = reverse('company-detail', args=[pk])
+        request = self.factory.delete(url)
+        force_authenticate(request, self.super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_NO_CONTENT)
+        self.assertNotIn(self.super_user_company, Company.objects.all())
+
+        # Normal user
+        pk = self.normal_company.pk
+        url = reverse('company-detail', args=[pk])
+        request = self.factory.delete(url)
+        force_authenticate(request, self.non_super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_NO_CONTENT)
+        self.assertNotIn(self.normal_company, Company.objects.all())
+
+    def test_superuser_delete_other(self):
+        """
+        Superuser should be able to DELETE objects created by others
+        """
+        pk = self.normal_company.pk
+        url = reverse('company-detail', args=[pk])
+        request = self.factory.delete(url)
+        force_authenticate(request, self.super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_NO_CONTENT)
+        self.assertNotIn(self.normal_company, Company.objects.all())
+
+    def test_normal_user_delete_other(self):
+        """
+        Non-superusers should not be able to DELETE objects created by others.
+        Requests should return 404 Not Found, as those items won't be in that
+        user's queryset
+        """
+        pk = self.super_user_company.pk
+        url = reverse('company-detail', args=[pk])
+        request = self.factory.delete(url)
+        force_authenticate(request, self.non_super_user)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_NOT_FOUND)
+        self.assertIn(self.super_user_company, Company.objects.all())
+
+    def test_unauthenticated_user_delete(self):
+        """
+        Unauthenticated requests to DELETE objects should return 403 Forbidden.
+        """
+        pk = self.super_user_company.pk
+        url = reverse('company-detail', args=[pk])
+        request = self.factory.delete(url)
+        response = self.detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_FORBIDDEN)
+        self.assertIn(self.super_user_company, Company.objects.all())

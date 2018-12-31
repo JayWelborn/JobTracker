@@ -1,5 +1,7 @@
 from rest_framework import permissions
-from rest_framework.exceptions import PermissionDenied
+# Commented this import out. It will only be needed if later we allow users
+# to query objects they didn't create.
+# from rest_framework.exceptions import PermissionDenied
 
 
 class IsOwnerOrAdmin(permissions.BasePermission):

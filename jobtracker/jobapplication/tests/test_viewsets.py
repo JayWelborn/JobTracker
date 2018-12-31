@@ -698,9 +698,9 @@ class JobReferenceViewsetTests(BaseJobapplicationViewsetTests):
         superuser_get_list: Superuser GET on listview should return all
             JobReference objects in the database, regardless of creator.
 
-    TODO
         authenticated_post: Regardless of user type, POST requests should create
             a new object if they contain complete, correct data.
+    TODO
         invalid_post: If the data is incomplete or incorrect, the POST should
             fail with status 400 BAD REQUEST.
         unauthenticated_post: Unauthenticated users attempting POST request
@@ -883,3 +883,25 @@ class JobReferenceViewsetTests(BaseJobapplicationViewsetTests):
             act_url = ret_ref['creator']
             exp_url = DOMAIN + reverse('user-detail', args=[db_ref.creator_id])
             self.assertEqual(act_url, exp_url)
+
+    def test_authenticated_post(self):
+        """
+        Regardless of user type, POST requests should create a new object if
+        they contain complete, correct data.
+        """
+        # Try POST with normal user, existing company
+        url = reverse('jobreference-list')
+        complete_data = {
+            'name': 'New Reference',
+            'email': 'new@reference.com',
+            'company': reverse('company-detail', args=[self.normal_company.pk])
+        }
+        request = self.factory.post(url, complete_data, format='json')
+        force_authenticate(request, user=self.non_super_user)
+        response = self.reference_listview(request)
+        self.assertEqual(response.status_code, STATUS_CREATED)
+        reference = JobReference.objects.get(name='New Reference')
+        self.assertEqual(reference.name, complete_data['name'])
+        self.assertEqual(reference.email, complete_data['email'])
+        self.assertEqual(reference.creator_id, self.non_super_user.id)
+        self.assertEqual(reference.company.id, self.normal_company.id)

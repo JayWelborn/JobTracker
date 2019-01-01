@@ -1,3 +1,23 @@
+"""Tests for Viewset classes defined in Viewsets.py
+
+Before anyone reads this file, please read this.
+
+I understand that this file is full of COPY/PASTA and repeating myself. This was
+a conscious decision.
+
+I believe that tests should be as easy as possible to read one at a time. I
+believe this because I read it in a book and it makes sense. In the future when
+one of these test cases fails because I change something, I want an immediate
+and extremely granular breakdown of exactly what broke. These tests will let
+me know exactly what type of request and what type of data wasn't handled as
+expected.
+
+The copy/paste now is insurance against future me's rage.
+
+Please forgive me, mysterious reader of my code, for not DRYing out my test
+cases.
+"""
+
 from django.contrib.auth.models import User
 from django.urls import reverse
 
@@ -700,19 +720,20 @@ class JobReferenceViewsetTests(BaseJobapplicationViewsetTests):
 
         authenticated_post: Regardless of user type, POST requests should create
             a new object if they contain complete, correct data.
-    TODO
         invalid_post: If the data is incomplete or incorrect, the POST should
             fail with status 400 BAD REQUEST.
         unauthenticated_post: Unauthenticated users attempting POST request
             should return 403
+
         authenticated_put: Correctly formed PUT requests should completely
-            overwrite old Company object data.
+            overwrite old JobReference object data.
         normal_user_put_other: Non superuser should not be able to send PUT
             requests to url of object created by another user
         invalid put: Incomplete PUT requests or PUT requests with invalid data
             should fail with status 400 Bad Request
         unauthenticated_put: PUT requests without authentication should return
             403 Forbidden.
+
         valid_patch: Normal users should be able to PATCH their own objects.
             Superusers should be able to PATCH all objects.
         normal_user_patch_other: Normal users should not be able to PATCH
@@ -720,6 +741,7 @@ class JobReferenceViewsetTests(BaseJobapplicationViewsetTests):
             so should return 404 Not Found.
         invalid_patch: PATCH requests with invalid data should fail with status
             400 Bad Request
+
         user_deletes_own:Both normal user and superuser should be able to delete
             objects they created.
         superuser_delete_other: Superuser should be able to DELETE objects
@@ -888,8 +910,10 @@ class JobReferenceViewsetTests(BaseJobapplicationViewsetTests):
         """
         Regardless of user type, POST requests should create a new object if
         they contain complete, correct data.
+
+        NOTE: For JobReferences, POST Requests must be made with existing
         """
-        # Try POST with normal user, existing company
+        # Try POST with normal user
         url = reverse('jobreference-list')
         complete_data = {
             'name': 'New Reference',
@@ -905,3 +929,346 @@ class JobReferenceViewsetTests(BaseJobapplicationViewsetTests):
         self.assertEqual(reference.email, complete_data['email'])
         self.assertEqual(reference.creator_id, self.non_super_user.id)
         self.assertEqual(reference.company.id, self.normal_company.id)
+
+    def test_invalid_post(self):
+        """
+        If the data is incomplete or incorrect, the POST should fail with status
+        400 BAD REQUEST
+        """
+        # Missing name
+        url = reverse('jobreference-list')
+        missing_name = {
+            'email': 'new@reference.com',
+            'company': reverse('company-detail', args=[self.normal_company.pk])
+        }
+        request = self.factory.post(url, missing_name)
+        force_authenticate(request, user=self.non_super_user)
+        response = self.reference_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+
+        request = self.factory.post(url, missing_name)
+        force_authenticate(request, user=self.super_user)
+        response = self.reference_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('name', response.data)
+
+        # Incorrect email
+        incorrect_email = {
+            'name': 'New Reference',
+            'email': 'new@reference',
+            'company': reverse('company-detail', args=[self.normal_company.pk])
+        }
+        request = self.factory.post(url, incorrect_email)
+        force_authenticate(request, user=self.super_user)
+        response = self.reference_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('email', response.data)
+
+        request = self.factory.post(url, incorrect_email)
+        force_authenticate(request, user=self.non_super_user)
+        response = self.reference_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('email', response.data)
+
+        # Missing Company
+        missing_company = {
+            'name': 'New Reference',
+            'email': 'new@reference.com',
+        }
+        request = self.factory.post(url, missing_company)
+        force_authenticate(request, user=self.super_user)
+        response = self.reference_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('company', response.data)
+
+        request = self.factory.post(url, missing_company)
+        force_authenticate(request, user=self.non_super_user)
+        response = self.reference_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('company', response.data)
+
+    def test_unauthenticated_post(self):
+        """
+        Unauthenticated POST requests should be rejected with 403 FORBIDDEN
+        """
+        url = reverse('jobreference-list')
+        complete_data = {
+            'name': 'New Reference',
+            'emeil': 'new@referencecom',
+            'company': reverse('company-detail', args=[self.normal_company.pk])
+        }
+        request = self.factory.post(url, complete_data)
+        response = self.reference_listview(request)
+        self.assertEqual(response.status_code, STATUS_FORBIDDEN)
+
+    def test_authenticated_put(self):
+        """
+        Correctly formed PUT requests should completely overwrite old
+        JobReference object data.
+        """
+        # Normal user PUT own object
+        pk = self.normal_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        data = {
+            'name': 'Updated Reference',
+            'email': 'new@reference.com',
+            'company': reverse('company-detail', args=[self.normal_company.pk])
+        }
+        request = self.factory.put(url, data)
+        force_authenticate(request, self.non_super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        reference = JobReference.objects.filter(creator=self.non_super_user)[0]
+        self.assertEqual(reference.name, data['name'])
+        self.assertEqual(reference.email, data['email'])
+        self.assertEqual(reference.creator_id, self.non_super_user.id)
+
+        # Superuser PUT own object
+        pk = self.super_user_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        data = {
+            'name': 'Super Updated Reference',
+            'email': 'supernew@reference.com',
+            'company': reverse('company-detail',
+                               args=[self.super_user_company.pk])
+        }
+        request = self.factory.put(url, data)
+        force_authenticate(request, self.super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        reference = JobReference.objects.filter(creator=self.super_user)[0]
+        self.assertEqual(reference.name, data['name'])
+        self.assertEqual(reference.email, data['email'])
+        self.assertEqual(reference.creator_id, self.super_user.id)
+
+        # Superuser PUT other object
+        pk = self.normal_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        data = {
+            'name': 'Updated Reference Again',
+            'email': 'new@reference.com',
+            'company': reverse('company-detail', args=[self.normal_company.pk])
+        }
+        request = self.factory.put(url, data)
+        force_authenticate(request, self.super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        reference = JobReference.objects.filter(creator=self.non_super_user)[0]
+        self.assertEqual(reference.name, data['name'])
+        self.assertEqual(reference.email, data['email'])
+        self.assertEqual(reference.creator_id, self.non_super_user.id)
+
+    def test_normal_user_put_other(self):
+        """
+        Non superuser should not be able to send PUT requests to url of object
+        created by another user.
+        """
+        pk = self.super_user_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        data = {
+            'name': 'Updated Reference',
+            'email': 'new@reference.com',
+            'company': reverse('company-detail',
+                               args=[self.super_user_company.pk])
+        }
+        request = self.factory.put(url, data)
+        force_authenticate(request, self.non_super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_NOT_FOUND)
+        reference = JobReference.objects.filter(creator=self.super_user)[0]
+        self.assertNotEqual(reference.name, data['name'])
+        self.assertNotEqual(reference.email, data['email'])
+        self.assertNotEqual(reference.creator_id, self.non_super_user.id)
+
+    def test_invalid_put(self):
+        """
+        Incomplete PUT requests or PUT requests with invalid data should fail
+        with status 400 Bad Request
+        """
+        pk = self.super_user_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        missing_name = {
+            'email': 'new@reference.com',
+            'company': reverse('company-detail', args=[self.normal_company.pk])
+        }
+        request = self.factory.put(url, missing_name)
+        force_authenticate(request, self.super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('name', response.data)
+
+        incorrect_email = {
+            'name': 'New Reference',
+            'email': 'new@reference',
+            'company': reverse('company-detail', args=[self.normal_company.pk])
+        }
+        request = self.factory.put(url, incorrect_email)
+        force_authenticate(request, self.super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('email', response.data)
+
+        missing_company = {
+            'name': 'New Reference',
+            'email': 'new@reference.com',
+        }
+        request = self.factory.put(url, missing_company)
+        force_authenticate(request, self.super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('company', response.data)
+
+    def test_unauthenticated_put(self):
+        """
+        PUT requests without authentication should return 403 Forbidden.
+        """
+        pk = self.normal_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        data = {
+            'name': 'Updated Reference',
+            'email': 'new@reference.com',
+            'company': reverse('company-detail',
+                               args=[self.super_user_company.pk])
+        }
+        request = self.factory.put(url, data)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_FORBIDDEN)
+
+    def test_valid_patch(self):
+        """
+        Normal users should be able to PATCH their own objects. Superusers
+        should be able to PATCH all objects.
+        """
+        # Normal user PATCH own object
+        pk = self.normal_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        data = {
+            'name': 'Patched Reference',
+        }
+        request = self.factory.patch(url, data)
+        force_authenticate(request, self.non_super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        reference = JobReference.objects.filter(creator=self.non_super_user)[0]
+        self.assertEqual(reference.name, data['name'])
+        self.assertEqual(reference.creator_id, self.non_super_user.id)
+
+        # Superuser PATCH own object
+        pk = self.super_user_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        data = {
+            'email': 'updated@email.com'
+        }
+        request = self.factory.patch(url, data)
+        force_authenticate(request, self.super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        reference = JobReference.objects.filter(creator=self.super_user)[0]
+        self.assertEqual(reference.email, data['email'])
+        self.assertEqual(reference.creator_id, self.super_user.id)
+
+        # Superuser PATCH other object
+        pk = self.normal_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        data = {
+            'name': 'Patched Reference Again',
+        }
+        request = self.factory.patch(url, data)
+        force_authenticate(request, self.super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        reference = JobReference.objects.filter(creator=self.non_super_user)[0]
+        self.assertEqual(reference.name, data['name'])
+        self.assertEqual(reference.creator_id, self.non_super_user.id)
+
+    def test_normal_user_patch_other(self):
+        """
+        Normal users should not be able to PATCH objects made by others. These
+        objects should not be queryable, and so should return 404 Not Found.
+        """
+        pk = self.super_user_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        data = {
+            'name': 'Patched Reference',
+        }
+        request = self.factory.patch(url, data)
+        force_authenticate(request, self.non_super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_NOT_FOUND)
+        reference = JobReference.objects.filter(creator=self.super_user)[0]
+        self.assertNotEqual(reference.name, data['name'])
+        self.assertNotEqual(reference.creator_id, self.non_super_user.id)
+
+    def test_invalid_patch(self):
+        """
+        PATCH requests with invalid data should fail with status 400 Bad Request
+        """
+        pk = self.super_user_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        invalid_email = {
+            'email': 'notan@email'
+        }
+        request = self.factory.patch(url, invalid_email)
+        force_authenticate(request, self.super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+
+    def test_user_deletes_own(self):
+        """
+        Both normal user and superuser should be able to DELETE objects they
+        created.
+        """
+        # Superuser
+        pk = self.super_user_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        request = self.factory.delete(url)
+        force_authenticate(request, self.super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_NO_CONTENT)
+        self.assertNotIn(self.super_user_reference, JobReference.objects.all())
+
+        # Normal user
+        pk = self.normal_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        request = self.factory.delete(url)
+        force_authenticate(request, self.non_super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_NO_CONTENT)
+        self.assertNotIn(self.normal_reference, JobReference.objects.all())
+
+    def test_superuser_delete_other(self):
+        """
+        Superuser should be able to DELETE objects created by others
+        """
+        pk = self.normal_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        request = self.factory.delete(url)
+        force_authenticate(request, self.super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_NO_CONTENT)
+        self.assertNotIn(self.normal_reference, JobReference.objects.all())
+
+    def test_normal_user_delete_other(self):
+        """
+        Non-superusers should not be able to DELETE objects created by others.
+        Requests should return 404 Not Found, as those items won't be in that
+        user's queryset
+        """
+        pk = self.super_user_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        request = self.factory.delete(url)
+        force_authenticate(request, self.non_super_user)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_NOT_FOUND)
+        self.assertIn(self.super_user_reference, JobReference.objects.all())
+
+    def test_unauthenticated_user_delete(self):
+        """
+        Unauthenticated requests to DELETE objects should return 403 Forbidden.
+        """
+        pk = self.super_user_reference.pk
+        url = reverse('jobreference-detail', args=[pk])
+        request = self.factory.delete(url)
+        response = self.reference_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_FORBIDDEN)
+        self.assertIn(self.super_user_reference, JobReference.objects.all())

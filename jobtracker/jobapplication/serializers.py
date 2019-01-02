@@ -116,7 +116,8 @@ class JobApplicationSerializer(serializers.HyperlinkedModelSerializer):
             'update_method', 'valid_update_methods',
         )
 
-    def get_valid_update_methods(self, instance):
+    @staticmethod
+    def get_valid_update_methods(instance):
         """
         Get a list of possible valid update methods for the current object
         instance. This list will depend on the current state of the object.

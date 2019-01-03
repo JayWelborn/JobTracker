@@ -1,8 +1,12 @@
 from datetime import date, timedelta
 
 from django.contrib.auth.models import User
+from django.urls import reverse
 
-from rest_framework.test import APITestCase
+from rest_framework.test import (APITestCase, APIRequestFactory,
+                                 force_authenticate,
+                                 )
+
 from rest_framework.serializers import ValidationError
 
 from ..models import Company, JobReference, JobApplication
@@ -355,6 +359,9 @@ class JobApplicationSerializerTests(APITestCase):
                 company, creator, position, city, state, status, submitted_date,
                 updated_date.
             All other fields should contain None
+        create_new_application_with_new_company: Providing a dictionary of
+            company data nested within a dictionary of application data should
+            succeed if the data is valid.
         validate_update_simple_methods: update methods should be considered
             valid if they match the `name` of one of the methods returned by
             the application's get_available_status_transitions() method
@@ -414,6 +421,7 @@ class JobApplicationSerializerTests(APITestCase):
             state=self.JOB_STATE
         )[0]
 
+        self.factory = APIRequestFactory()
         self.context = {'request': None}
 
     def tearDown(self):
@@ -481,6 +489,40 @@ class JobApplicationSerializerTests(APITestCase):
         # Ensure expected methods are present in valid_update_methods
         for method in ['reject', 'send_followup']:
             self.assertIn(method, serializer.data['valid_update_methods'])
+
+    def test_create_new_application_with_new_company(self):
+        """
+        Providing a dictionary of company data nested within a dictionary of
+        application data should succeed if the data is valid.
+        """
+        name = 'Application Post Test Company'
+        company_data = {
+            'name': name,
+            'website': 'https://www.apptestcompany.com',
+        }
+        application_data = {
+            'position': 'Post Test Position',
+            'company': company_data,
+            'city': 'Post Test city',
+            'state': 'VA',
+
+        }
+        request = self.factory.post(reverse('jobapplication-list'),
+                                    application_data, format='json')
+        force_authenticate(request, self.user)
+        request.user = self.user
+        self.context['request'] = request
+        serializer = JobApplicationSerializer(data=application_data,
+                                              context=self.context)
+        self.assertTrue(serializer.is_valid())
+        serializer.save()
+
+        company = Company.objects.get(name=name)
+        self.assertEqual(company_data['name'], company.name)
+
+        application = JobApplication.objects.get(
+            position=application_data['position'])
+        self.assertEqual(application.position, application_data['position'])
 
     def test_validate_update_simple_methods(self):
         """

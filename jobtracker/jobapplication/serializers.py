@@ -33,6 +33,12 @@ class CompanySerializer(serializers.HyperlinkedModelSerializer):
         read_only=True
     )
 
+    job_applications = serializers.HyperlinkedRelatedField(
+        many=True,
+        view_name='jobapplication-detail',
+        read_only=True
+    )
+
     class Meta:
         model = Company
         fields = (
@@ -90,7 +96,14 @@ class JobApplicationSerializer(serializers.HyperlinkedModelSerializer):
         fields: fields to include in serialization
 
     Methods:
-        is_valid: Perform validation sp
+        get_valid_update_methods: Return a list of the currently available
+            update methods
+        validate_update_method: Check to make sure a valid upgrade method was
+            passed in
+        update: Add status transitions to update method, then perform normal
+            update
+        create: Get or create the company passed in the serializer data, then
+            create a new Application from the passed in data.
 
     References:
     """
@@ -175,3 +188,19 @@ class JobApplicationSerializer(serializers.HyperlinkedModelSerializer):
                 update_method()
         return super(JobApplicationSerializer, self).update(instance,
                                                             validated_data)
+
+    def create(self, validated_data):
+        """
+        Create a new Jobapplication and a new Company, if applicable
+        :param validated_data: Data which has survived the is_valid() checks
+        :return: newly created object instance
+        """
+        comp_data = validated_data['company']
+        company = Company.objects.get_or_create(
+            name=comp_data['name'], website=comp_data['website'],
+            creator=self.context['request'].user)[0]
+        return JobApplication.objects.get_or_create(
+            position=validated_data['position'], city=validated_data['city'],
+            creator=self.context['request'].user, state=validated_data['state'],
+            company=company
+        )[0]

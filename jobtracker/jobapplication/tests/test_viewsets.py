@@ -103,13 +103,13 @@ class BaseJobapplicationViewsetTests(APITestCase):
         )[0]
 
         # JobApplications
-        self.normal_jobapp = JobApplication.objects.get_or_create(
+        self.normal_application = JobApplication.objects.get_or_create(
             position="Normal " + self.POSITION, city="normal " + self.CITY,
             state="normal " + self.STATE, company=self.normal_company,
             creator=self.non_super_user
         )[0]
 
-        self.super_user_jobapp = JobApplication.objects.get_or_create(
+        self.super_user_application = JobApplication.objects.get_or_create(
             position="Super " + self.POSITION, city="Super " + self.CITY,
             state="Super " + self.STATE, company=self.super_user_company,
             creator=self.super_user
@@ -1368,7 +1368,7 @@ class JobApplicationViewsetTests(BaseJobapplicationViewsetTests):
         Non super-user should not be able to GET a different user's application
         details. Should return 404 so user doesn't know object exists at all.
         """
-        pk = self.super_user_jobapp.pk
+        pk = self.super_user_application.pk
         request = self.factory.get(reverse('jobapplication-detail', args=[pk]))
         force_authenticate(request, user=self.non_super_user)
 
@@ -1382,7 +1382,7 @@ class JobApplicationViewsetTests(BaseJobapplicationViewsetTests):
         """
         Non superuser should be able to GET their own application's details
         """
-        pk = self.normal_jobapp.pk
+        pk = self.normal_application.pk
         request = self.factory.get(reverse('jobapplication-detail', args=[pk]))
         force_authenticate(request, user=self.non_super_user)
         response = self.application_detailview(request, pk=pk)
@@ -1394,11 +1394,11 @@ class JobApplicationViewsetTests(BaseJobapplicationViewsetTests):
         expected_url = DOMAIN + reverse('jobapplication-detail', args=[pk])
         self.assertEqual(actual_url, expected_url)
 
-        self.assertEqual(data['id'], str(self.normal_jobapp.pk))
-        self.assertEqual(data['position'], self.normal_jobapp.position)
-        self.assertEqual(data['city'], self.normal_jobapp.city)
-        self.assertEqual(data['state'], self.normal_jobapp.state)
-        self.assertEqual(data['status'], self.normal_jobapp.status)
+        self.assertEqual(data['id'], str(self.normal_application.pk))
+        self.assertEqual(data['position'], self.normal_application.position)
+        self.assertEqual(data['city'], self.normal_application.city)
+        self.assertEqual(data['state'], self.normal_application.state)
+        self.assertEqual(data['status'], self.normal_application.status)
 
         actual_url = data['creator']
         expected_url = DOMAIN + reverse('user-detail',
@@ -1426,116 +1426,144 @@ class JobApplicationViewsetTests(BaseJobapplicationViewsetTests):
         self.assertEqual(response.status_code, STATUS_OK)
 
         # Ensure the correct number of records are present
-        returned_jobapps = response.data['results']
-        db_references = JobApplication.objects.filter(
+        returned_applications = response.data['results']
+        db_applications = JobApplication.objects.filter(
             creator=self.non_super_user).order_by('submitted_date')
-        self.assertEqual(len(returned_jobapps), len(db_references))
+        self.assertEqual(len(returned_applications), len(db_applications))
 
-        for ret_ref, db_ref in zip(returned_jobapps, db_references):
-            self.assertEqual(ret_ref['id'], str(db_ref.id))
-            self.assertEqual(ret_ref['position'], db_ref.position)
-            self.assertEqual(ret_ref['city'], db_ref.city)
-            self.assertEqual(ret_ref['state'], db_ref.state)
-            self.assertEqual(ret_ref['status'], db_ref.status)
-            act_url = ret_ref['creator']
-            exp_url = DOMAIN + reverse('user-detail', args=[db_ref.creator_id])
+        for ret_app, db_app in zip(returned_applications, db_applications):
+            self.assertEqual(ret_app['id'], str(db_app.id))
+            self.assertEqual(ret_app['position'], db_app.position)
+            self.assertEqual(ret_app['city'], db_app.city)
+            self.assertEqual(ret_app['state'], db_app.state)
+            self.assertEqual(ret_app['status'], db_app.status)
+            act_url = ret_app['creator']
+            exp_url = DOMAIN + reverse('user-detail', args=[db_app.creator_id])
             self.assertEqual(act_url, exp_url)
+
+            act_comp = ret_app['company']
+            exp_comp = db_app.company
+            self.assertEqual(act_comp['name'], exp_comp.name)
+            self.assertEqual(act_comp['website'], exp_comp.website)
 
     def test_superuser_get_other(self):
         """
         Superuser should be allowed to GET objects created
         by another user.
         """
-        pk = self.normal_jobapp.pk
+        pk = self.normal_application.pk
         request = self.factory.get(reverse('jobapplication-detail', args=[pk]))
         force_authenticate(request, user=self.super_user)
 
         response = self.application_detailview(request, pk=pk)
         self.assertEqual(response.status_code, STATUS_OK)
         application = response.data
-        self.assertEqual(application['position'], self.normal_jobapp.position)
-        self.assertEqual(application['city'], self.normal_jobapp.city)
-        self.assertEqual(application['state'], self.normal_jobapp.state)
-        self.assertEqual(application['status'], self.normal_jobapp.status)
+        self.assertEqual(application['position'],
+                         self.normal_application.position)
+        self.assertEqual(application['city'], self.normal_application.city)
+        self.assertEqual(application['state'], self.normal_application.state)
+        self.assertEqual(application['status'], self.normal_application.status)
         act_url = application['creator']
         exp_url = DOMAIN + reverse('user-detail',
                                    args=[self.non_super_user.id])
         self.assertEqual(act_url, exp_url)
 
-    # def test_superuser_get_own(self):
-    #     """
-    #     Superuser should be allowed to GET their own JobReference records
-    #     """
-    #     pk = self.super_user_reference.pk
-    #     request = self.factory.get(reverse('jobreference-detail', args=[pk]))
-    #     force_authenticate(request, user=self.super_user)
-    #
-    #     response = self.reference_detailview(request, pk=pk)
-    #     self.assertEqual(response.status_code, STATUS_OK)
-    #     reference = response.data
-    #     self.assertEqual(reference['name'], self.super_user_reference.name)
-    #     self.assertEqual(reference['email'], self.super_user_reference.email)
-    #     act_url = reference['creator']
-    #     exp_url = DOMAIN + reverse('user-detail', args=[self.super_user.id])
-    #     self.assertEqual(act_url, exp_url)
-    #
-    # def test_superuser_get_list(self):
-    #     """
-    #     Superuser GET on listview should return all JobReference objects in the
-    #     database, regardless of creator
-    #     """
-    #     JobReference.objects.get_or_create(
-    #         name="throwaway", email="throw@away.com",
-    #         creator=self.non_super_user, company=self.normal_company,
-    #     )
-    #
-    #     JobReference.objects.get_or_create(
-    #         name="throwaway super", email="throwaway@super.com",
-    #         creator=self.super_user, company=self.super_user_company,
-    #     )
-    #
-    #     request = self.factory.get(reverse('jobreference-list'))
-    #     force_authenticate(request, user=self.super_user)
-    #     response = self.reference_listview(request)
-    #     self.assertEqual(response.status_code, STATUS_OK)
-    #
-    #     # Ensure the correct number of records are present
-    #     returned_references = response.data['results']
-    #     db_references = JobReference.objects.all().order_by('name')
-    #     self.assertEqual(len(returned_references), len(db_references))
-    #
-    #     for ret_ref, db_ref in zip(returned_references, db_references):
-    #         self.assertEqual(ret_ref['id'], str(db_ref.id))
-    #         self.assertEqual(ret_ref['name'], db_ref.name)
-    #         self.assertEqual(ret_ref['email'], db_ref.email)
-    #         act_url = ret_ref['creator']
-    #         exp_url = DOMAIN + reverse('user-detail', args=[db_ref.creator_id])
-    #         self.assertEqual(act_url, exp_url)
-    #
-    # def test_authenticated_post(self):
-    #     """
-    #     Regardless of user type, POST requests should create a new object if
-    #     they contain complete, correct data.
-    #
-    #     NOTE: For JobReferences, POST Requests must be made with existing
-    #     """
-    #     # Try POST with normal user
-    #     url = reverse('jobreference-list')
-    #     complete_data = {
-    #         'name': 'New Reference',
-    #         'email': 'new@reference.com',
-    #         'company': reverse('company-detail', args=[self.normal_company.pk])
-    #     }
-    #     request = self.factory.post(url, complete_data, format='json')
-    #     force_authenticate(request, user=self.non_super_user)
-    #     response = self.reference_listview(request)
-    #     self.assertEqual(response.status_code, STATUS_CREATED)
-    #     reference = JobReference.objects.get(name='New Reference')
-    #     self.assertEqual(reference.name, complete_data['name'])
-    #     self.assertEqual(reference.email, complete_data['email'])
-    #     self.assertEqual(reference.creator_id, self.non_super_user.id)
-    #     self.assertEqual(reference.company.id, self.normal_company.id)
-    #
+    def test_superuser_get_own(self):
+        """
+        Superuser should be allowed to GET their own object records
+        """
+        pk = self.super_user_application.pk
+        request = self.factory.get(reverse('jobapplication-detail', args=[pk]))
+        force_authenticate(request, user=self.super_user)
+
+        response = self.application_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        application = response.data
+        self.assertEqual(application['position'],
+                         self.super_user_application.position)
+        self.assertEqual(application['city'], self.super_user_application.city)
+        self.assertEqual(application['state'],
+                         self.super_user_application.state)
+        self.assertEqual(application['status'],
+                         self.super_user_application.status)
+        act_url = application['creator']
+        exp_url = DOMAIN + reverse('user-detail', args=[self.super_user.id])
+        self.assertEqual(act_url, exp_url)
+
+    def test_superuser_get_list(self):
+        """
+        Superuser GET on listview should return all objects in the
+        database, regardless of creator.
+        """
+        JobApplication.objects.get_or_create(
+            position="throwaway", city="Watertown", state="NY",
+            company=self.normal_company, creator=self.non_super_user,
+        )
+
+        JobApplication.objects.get_or_create(
+            position="throwaway super", city="Watertown", state="NY",
+            creator=self.super_user, company=self.super_user_company,
+        )
+
+        request = self.factory.get(reverse('jobreference-list'))
+        force_authenticate(request, user=self.super_user)
+        response = self.application_listview(request)
+        self.assertEqual(response.status_code, STATUS_OK)
+
+        # Ensure the correct number of records are present
+        returned_applications = response.data['results']
+        db_applications = JobApplication.objects.all().order_by(
+            'submitted_date')
+        self.assertEqual(len(returned_applications), len(db_applications))
+
+        for ret_app, db_app in zip(returned_applications, db_applications):
+            self.assertEqual(ret_app['id'], str(db_app.id))
+            self.assertEqual(ret_app['position'], db_app.position)
+            self.assertEqual(ret_app['city'], db_app.city)
+            self.assertEqual(ret_app['state'], db_app.state)
+            self.assertEqual(ret_app['status'], db_app.status)
+            act_url = ret_app['creator']
+            exp_url = DOMAIN + reverse('user-detail', args=[db_app.creator_id])
+            self.assertEqual(act_url, exp_url)
+
+            act_comp = ret_app['company']
+            exp_comp = db_app.company
+            self.assertEqual(act_comp['name'], exp_comp.name)
+            self.assertEqual(act_comp['website'], exp_comp.website)
+
+    def test_authenticated_post(self):
+        """
+        Regardless of user type, POST requests should create a new object if
+        they contain complete, correct data.
+
+
+        """
+        # Try POST with normal user
+        url = reverse('jobreference-list')
+        company_data = {
+            'name': 'Application Post Test Company',
+            'website': 'https://www.apptestcompany.com',
+        }
+        application_data = {
+            'position': 'Post Test Position',
+            'company': company_data,
+            'city': 'Post Test city',
+            'state': 'VA',
+
+        }
+        request = self.factory.post(url, application_data, format='json')
+        force_authenticate(request, user=self.non_super_user)
+        response = self.application_listview(request)
+        self.assertEqual(response.status_code, STATUS_CREATED)
+
+        application = JobApplication.objects.get(
+            position=application_data['position'])
+        company = Company.objects.get(name=company_data['name'])
+        self.assertEqual(application.position, application_data['position'])
+        self.assertEqual(application.city, application_data['city'])
+        self.assertEqual(application.creator_id, self.non_super_user.id)
+        self.assertEqual(application.company.id, company.id)
+
     # def test_invalid_post(self):
     #     """
     #     If the data is incomplete or incorrect, the POST should fail with status

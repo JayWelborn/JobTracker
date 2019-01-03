@@ -31,7 +31,6 @@ class BaseViewset(viewsets.ModelViewSet):
     order_by_field = None
     permission_classes = (permissions.IsAuthenticated, IsOwnerOrAdmin)
 
-
     def get_queryset(self):
         """
         Return a list of objects created by the current user. If they are a

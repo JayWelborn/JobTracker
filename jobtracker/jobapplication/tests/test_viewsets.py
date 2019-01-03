@@ -59,7 +59,7 @@ class BaseJobapplicationViewsetTests(APITestCase):
     SUPERPASSWORD = "pfa23po4u2oidfsjlkjf"
 
     COMPANY_NAME = "Normal Company"
-    COMPANY_WEBSITE = "www.website.com"
+    COMPANY_WEBSITE = "https://www.website.com"
 
     REFERENCE_NAME = "user's friend"
     REFERENCE_EMAIL = "friend@gmail.com"
@@ -1319,8 +1319,13 @@ class JobApplicationViewsetTests(BaseJobapplicationViewsetTests):
         superuser_get_list: Superuser GET on listview should return all
             JobReference objects in the database, regardless of creator.
 
-        authenticated_post: Regardless of user type, POST requests should create
-            a new object if they contain complete, correct data.
+        authenticated_post_with_new_company: Regardless of user type, POST
+            requests should create a new object if they contain complete,
+            correct data. If the provided data doesn't match that of an existing
+            company, a new company should be created.
+        authenticated_post_with_existing_company: POST requests containing
+            data that matches an existing company should make a new
+            JobApplication object that refers to the existing company
         invalid_post: If the data is incomplete or incorrect, the POST should
             fail with status 400 BAD REQUEST.
         unauthenticated_post: Unauthenticated users attempting POST request
@@ -1531,12 +1536,10 @@ class JobApplicationViewsetTests(BaseJobapplicationViewsetTests):
             self.assertEqual(act_comp['name'], exp_comp.name)
             self.assertEqual(act_comp['website'], exp_comp.website)
 
-    def test_authenticated_post(self):
+    def test_authenticated_post_with_new_company(self):
         """
         Regardless of user type, POST requests should create a new object if
         they contain complete, correct data.
-
-
         """
         # Try POST with normal user
         url = reverse('jobreference-list')
@@ -1549,11 +1552,12 @@ class JobApplicationViewsetTests(BaseJobapplicationViewsetTests):
             'company': company_data,
             'city': 'Post Test city',
             'state': 'VA',
-
         }
         request = self.factory.post(url, application_data, format='json')
         force_authenticate(request, user=self.non_super_user)
         response = self.application_listview(request)
+        application_data = response.data
+        company_data = response.data['company']
         self.assertEqual(response.status_code, STATUS_CREATED)
 
         application = JobApplication.objects.get(
@@ -1562,78 +1566,172 @@ class JobApplicationViewsetTests(BaseJobapplicationViewsetTests):
         self.assertEqual(application.position, application_data['position'])
         self.assertEqual(application.city, application_data['city'])
         self.assertEqual(application.creator_id, self.non_super_user.id)
-        self.assertEqual(application.company.id, company.id)
+        self.assertEqual(application.company_id, company.id)
 
-    # def test_invalid_post(self):
-    #     """
-    #     If the data is incomplete or incorrect, the POST should fail with status
-    #     400 BAD REQUEST
-    #     """
-    #     # Missing name
-    #     url = reverse('jobreference-list')
-    #     missing_name = {
-    #         'email': 'new@reference.com',
-    #         'company': reverse('company-detail', args=[self.normal_company.pk])
-    #     }
-    #     request = self.factory.post(url, missing_name)
-    #     force_authenticate(request, user=self.non_super_user)
-    #     response = self.reference_listview(request)
-    #     self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
-    #
-    #     request = self.factory.post(url, missing_name)
-    #     force_authenticate(request, user=self.super_user)
-    #     response = self.reference_listview(request)
-    #     self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
-    #     self.assertIn('name', response.data)
-    #
-    #     # Incorrect email
-    #     incorrect_email = {
-    #         'name': 'New Reference',
-    #         'email': 'new@reference',
-    #         'company': reverse('company-detail', args=[self.normal_company.pk])
-    #     }
-    #     request = self.factory.post(url, incorrect_email)
-    #     force_authenticate(request, user=self.super_user)
-    #     response = self.reference_listview(request)
-    #     self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
-    #     self.assertIn('email', response.data)
-    #
-    #     request = self.factory.post(url, incorrect_email)
-    #     force_authenticate(request, user=self.non_super_user)
-    #     response = self.reference_listview(request)
-    #     self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
-    #     self.assertIn('email', response.data)
-    #
-    #     # Missing Company
-    #     missing_company = {
-    #         'name': 'New Reference',
-    #         'email': 'new@reference.com',
-    #     }
-    #     request = self.factory.post(url, missing_company)
-    #     force_authenticate(request, user=self.super_user)
-    #     response = self.reference_listview(request)
-    #     self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
-    #     self.assertIn('company', response.data)
-    #
-    #     request = self.factory.post(url, missing_company)
-    #     force_authenticate(request, user=self.non_super_user)
-    #     response = self.reference_listview(request)
-    #     self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
-    #     self.assertIn('company', response.data)
-    #
-    # def test_unauthenticated_post(self):
-    #     """
-    #     Unauthenticated POST requests should be rejected with 403 FORBIDDEN
-    #     """
-    #     url = reverse('jobreference-list')
-    #     complete_data = {
-    #         'name': 'New Reference',
-    #         'emeil': 'new@referencecom',
-    #         'company': reverse('company-detail', args=[self.normal_company.pk])
-    #     }
-    #     request = self.factory.post(url, complete_data)
-    #     response = self.reference_listview(request)
-    #     self.assertEqual(response.status_code, STATUS_FORBIDDEN)
+        # POST with super user
+        company_data = {
+            'name': 'Super Application Post Test Company',
+            'website': 'https://www.superapptestcompany.com',
+        }
+        application_data = {
+            'position': 'Super Post Test Position',
+            'company': company_data,
+            'city': 'PSuper ost Test city',
+            'state': 'VA',
+
+        }
+        request = self.factory.post(url, application_data, format='json')
+        force_authenticate(request, user=self.super_user)
+        response = self.application_listview(request)
+        application_data = response.data
+        company_data = response.data['company']
+        self.assertEqual(response.status_code, STATUS_CREATED)
+
+        application = JobApplication.objects.get(
+            position=application_data['position'])
+        company = Company.objects.get(name=company_data['name'])
+        self.assertEqual(application.position, application_data['position'])
+        self.assertEqual(application.city, application_data['city'])
+        self.assertEqual(application.creator_id, self.super_user.id)
+        self.assertEqual(application.company_id, company.id)
+
+    def test_authenticated_post_with_existing_company(self):
+        """
+        POST requests using the data of an existing company should
+        """
+        # POST with existing company data
+        url = reverse('jobapplication-list')
+        company_data = {
+            'name': self.normal_company.name,
+            'website': self.normal_company.website,
+        }
+        application_data = {
+            'position': 'Post Test Position',
+            'company': company_data,
+            'city': 'Post Test city',
+            'state': 'VA',
+        }
+        request = self.factory.post(url, application_data, format='json')
+        force_authenticate(request, user=self.non_super_user)
+        response = self.application_listview(request)
+        application_data = response.data
+        company_data = response.data['company']
+        self.assertEqual(response.status_code, STATUS_CREATED)
+
+        application = JobApplication.objects.get(
+            position=application_data['position'])
+        company = self.normal_company
+
+        # Check application data
+        self.assertEqual(application.position, application_data['position'])
+        self.assertEqual(application.city, application_data['city'])
+        self.assertEqual(application.creator_id, self.non_super_user.id)
+        self.assertEqual(application.company_id, company.id)
+
+        # Check company data
+        self.assertEqual(str(company.id), company_data['id'])
+        self.assertEqual(len(Company.objects.all()), 2)
+
+    def test_invalid_post(self):
+        """
+        If the data is incomplete or incorrect, the POST should fail with status
+        400 BAD REQUEST
+        """
+        # Missing position
+        url = reverse('jobapplication-list')
+        company_data = {
+            'name': self.normal_company.name,
+            'website': self.normal_company.website,
+        }
+        missing_position = {
+            'company': company_data,
+            'city': 'Post Test city',
+            'state': 'VA',
+        }
+        request = self.factory.post(url, missing_position, format='json')
+        force_authenticate(request, user=self.non_super_user)
+        response = self.application_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('position', response.data)
+
+        request = self.factory.post(url, missing_position, format='json')
+        force_authenticate(request, user=self.super_user)
+        response = self.application_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('position', response.data)
+
+        # Missing Company
+        missing_company = {
+            'position': 'Post Test Position',
+            'city': 'Post Test city',
+            'state': 'VA',
+        }
+        request = self.factory.post(url, missing_company, format='json')
+        force_authenticate(request, user=self.non_super_user)
+        response = self.application_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('company', response.data)
+
+        request = self.factory.post(url, missing_company, format='json')
+        force_authenticate(request, user=self.super_user)
+        response = self.application_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('company', response.data)
+
+        # Missing City
+        missing_position = {
+            'position': 'Post Test Position',
+            'company': company_data,
+            'state': 'VA',
+        }
+        request = self.factory.post(url, missing_position, format='json')
+        force_authenticate(request, user=self.non_super_user)
+        response = self.application_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('city', response.data)
+
+        request = self.factory.post(url, missing_position, format='json')
+        force_authenticate(request, user=self.super_user)
+        response = self.application_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('city', response.data)
+
+        # Missing State
+        missing_position = {
+            'position': 'Post Test Position',
+            'company': company_data,
+            'city': 'Post Test city',
+        }
+        request = self.factory.post(url, missing_position, format='json')
+        force_authenticate(request, user=self.non_super_user)
+        response = self.application_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('state', response.data)
+
+        request = self.factory.post(url, missing_position, format='json')
+        force_authenticate(request, user=self.super_user)
+        response = self.application_listview(request)
+        self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+        self.assertIn('state', response.data)
+
+    def test_unauthenticated_post(self):
+        """
+        Unauthenticated POST requests should be rejected with 403 FORBIDDEN
+        """
+        url = reverse('jobapplication-list')
+        company_data = {
+            'name': self.normal_company.name,
+            'website': self.normal_company.website,
+        }
+        application_data = {
+            'position': 'Post Test Position',
+            'company': company_data,
+            'city': 'Post Test city',
+            'state': 'VA',
+        }
+        request = self.factory.post(url, application_data, format='json')
+        response = self.application_listview(request)
+        self.assertEqual(response.status_code, STATUS_FORBIDDEN)
     #
     # def test_authenticated_put(self):
     #     """

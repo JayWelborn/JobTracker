@@ -191,7 +191,8 @@ class JobApplicationSerializer(serializers.HyperlinkedModelSerializer):
 
     def create(self, validated_data):
         """
-        Create a new Jobapplication and a new Company, if applicable
+        Create a new Jobapplication and a new Company, if applicable.
+        
         :param validated_data: Data which has survived the is_valid() checks
         :return: newly created object instance
         """

@@ -209,7 +209,7 @@ class JobReferenceSerializerTests(APITestCase):
     PASSWORD = "IOPU@#Y$MbSDF"
     USER_EMAIL = "lazertag@hotness.mailcom"
     COMP_NAME = "TESTNAME"
-    COMP_SITE = "www.testsite.com"
+    COMP_SITE = "https://www.testsite.com"
     REF_NAME = "Jimothy"
     REF_EMAIL = "jimothy@jim.othy"
 
@@ -362,6 +362,9 @@ class JobApplicationSerializerTests(APITestCase):
         create_new_application_with_new_company: Providing a dictionary of
             company data nested within a dictionary of application data should
             succeed if the data is valid.
+        create_new_application_with_existing_company: Creating a new application
+            using existing company data should make a new application that
+            refers to the existing company.
         validate_update_simple_methods: update methods should be considered
             valid if they match the `name` of one of the methods returned by
             the application's get_available_status_transitions() method
@@ -383,7 +386,7 @@ class JobApplicationSerializerTests(APITestCase):
     PASSWORD = "IOPU@#Y$MbSDF"
     USER_EMAIL = "lazertag@hotness.mailcom"
     COMP_NAME = "TESTNAME"
-    COMP_SITE = "www.testsite.com"
+    COMP_SITE = "https://www.testsite.com"
     REF_NAME = "Jimothy"
     REF_EMAIL = "jimothy@jim.othy"
     JOB_POSITION = "Software Engineer"
@@ -523,6 +526,40 @@ class JobApplicationSerializerTests(APITestCase):
         application = JobApplication.objects.get(
             position=application_data['position'])
         self.assertEqual(application.position, application_data['position'])
+
+    def test_create_new_application_with_existing_company(self):
+        """
+        Creating a new application using existing company data should make
+        a new application that refers to the existing company
+        """
+        company_data = {
+            'name': self.company.name,
+            'website': self.company.website
+        }
+        application_data = {
+            'position': 'Partial Post Test',
+            'company': company_data,
+            'city': 'Partial Post City',
+            'state': 'WA'
+        }
+        request = self.factory.post(reverse('jobapplication-list'),
+                                    application_data, format='json')
+        force_authenticate(request, self.user)
+        request.user = self.user
+        self.context['request'] = request
+
+        serializer = JobApplicationSerializer(data=application_data,
+                                              context=self.context)
+
+        self.assertTrue(serializer.is_valid())
+        application = serializer.save()
+        self.assertEqual(1, len(Company.objects.all()))
+        self.assertEqual(2, len(JobApplication.objects.all()))
+        self.assertEqual(application.position, application_data['position'])
+        self.assertEqual(application.city, application_data['city'])
+        self.assertEqual(application.state, application_data['state'])
+        self.assertEqual(application.status, 'submitted')
+        self.assertEqual(application.company, self.company)
 
     def test_validate_update_simple_methods(self):
         """

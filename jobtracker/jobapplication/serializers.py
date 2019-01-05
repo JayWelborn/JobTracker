@@ -175,6 +175,7 @@ class JobApplicationSerializer(serializers.HyperlinkedModelSerializer):
         :param validated_data: Validated JSON data
         :return: updated object instance
         """
+        # Perform update method if one is provided
         method_name = validated_data.get('update_method')
         interview_date = validated_data.get('interview_date')
         rejected_reason = validated_data.get('rejected_reason')
@@ -186,13 +187,30 @@ class JobApplicationSerializer(serializers.HyperlinkedModelSerializer):
                 update_method(rejected_reason)
             else:
                 update_method()
-        return super(JobApplicationSerializer, self).update(instance,
-                                                            validated_data)
+
+        # Set company
+        try:
+            company_data = validated_data.pop('company')
+            company = Company.objects.get_or_create(
+                name=company_data['name'], website=company_data['website']
+            )[0]
+            instance.company = company
+        except KeyError:
+            pass
+
+        # Update all the other attributes
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+
+        with transaction.atomic():
+            instance.save()
+
+        return instance
 
     def create(self, validated_data):
         """
         Create a new Jobapplication and a new Company, if applicable.
-        
+
         :param validated_data: Data which has survived the is_valid() checks
         :return: newly created object instance
         """
@@ -200,6 +218,7 @@ class JobApplicationSerializer(serializers.HyperlinkedModelSerializer):
         company = Company.objects.get_or_create(
             name=comp_data['name'], website=comp_data['website'],
             creator=self.context['request'].user)[0]
+
         return JobApplication.objects.get_or_create(
             position=validated_data['position'], city=validated_data['city'],
             creator=self.context['request'].user, state=validated_data['state'],

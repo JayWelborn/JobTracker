@@ -22,8 +22,7 @@ jobs by providing a one-stop dashboard for your job search.
 
 - [Virtualenv](https://virtualenv.pypa.io/en/latest/) and 
   [pip](https://pip.pypa.io/en/stable/) to manage Python dependencies
-- [django-fsm](https://github.com/viewflow/django-fsm) and
-  [drf-fsm-transitions](https://github.com/jacobh/drf-fsm-transitions) to model
+- [django-fsm](https://github.com/viewflow/django-fsm) to model
   finite state machine
 - [TravisCI](https://travis-ci.com/) for testing on each commit
 - [CodeCov](https://codecov.io/) to track test coverage over time

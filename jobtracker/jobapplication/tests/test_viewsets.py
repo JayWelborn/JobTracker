@@ -17,8 +17,10 @@ The copy/paste now is insurance against future me's rage.
 Please forgive me, mysterious reader of my code, for not DRYing out my test
 cases.
 """
+from datetime import timedelta, date
 
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.urls import reverse
 
 from rest_framework.test import (APITestCase, APIRequestFactory,
@@ -1340,13 +1342,16 @@ class JobApplicationViewsetTests(BaseJobapplicationViewsetTests):
         unauthenticated_put: PUT requests without authentication should return
             403 Forbidden.
 
-        valid_patch: Normal users should be able to PATCH their own objects.
+        simple_patch: Normal users should be able to PATCH their own objects.
             Superusers should be able to PATCH all objects.
+        update_application_valid_methods: Patch requests with valid
+            `update_method` fields should update the underlying database object
+            appropriately. This method walks a request through the update chain,
+            also checking that you can reject from every state.
+        TODO: PATCH with invalid update methods
         normal_user_patch_other: Normal users should not be able to PATCH
             objects made by others. These objects should not be queryable, and
             so should return 404 Not Found.
-        invalid_patch: PATCH requests with invalid data should fail with status
-            400 Bad Request
 
         user_deletes_own:Both normal user and superuser should be able to delete
             objects they created.
@@ -1917,53 +1922,270 @@ class JobApplicationViewsetTests(BaseJobapplicationViewsetTests):
         response = self.reference_detailview(request, pk=pk)
         self.assertEqual(response.status_code, STATUS_FORBIDDEN)
 
-    # def test_valid_patch(self):
-    #     """
-    #     Normal users should be able to PATCH their own objects. Superusers
-    #     should be able to PATCH all objects.
-    #     """
-    #     # Normal user PATCH own object
-    #     pk = self.normal_reference.pk
-    #     url = reverse('jobreference-detail', args=[pk])
-    #     data = {
-    #         'name': 'Patched Reference',
-    #     }
-    #     request = self.factory.patch(url, data)
-    #     force_authenticate(request, self.non_super_user)
-    #     response = self.reference_detailview(request, pk=pk)
-    #     self.assertEqual(response.status_code, STATUS_OK)
-    #     reference = JobReference.objects.filter(creator=self.non_super_user)[0]
-    #     self.assertEqual(reference.name, data['name'])
-    #     self.assertEqual(reference.creator_id, self.non_super_user.id)
-    #
-    #     # Superuser PATCH own object
-    #     pk = self.super_user_reference.pk
-    #     url = reverse('jobreference-detail', args=[pk])
-    #     data = {
-    #         'email': 'updated@email.com'
-    #     }
-    #     request = self.factory.patch(url, data)
-    #     force_authenticate(request, self.super_user)
-    #     response = self.reference_detailview(request, pk=pk)
-    #     self.assertEqual(response.status_code, STATUS_OK)
-    #     reference = JobReference.objects.filter(creator=self.super_user)[0]
-    #     self.assertEqual(reference.email, data['email'])
-    #     self.assertEqual(reference.creator_id, self.super_user.id)
-    #
-    #     # Superuser PATCH other object
-    #     pk = self.normal_reference.pk
-    #     url = reverse('jobreference-detail', args=[pk])
-    #     data = {
-    #         'name': 'Patched Reference Again',
-    #     }
-    #     request = self.factory.patch(url, data)
-    #     force_authenticate(request, self.super_user)
-    #     response = self.reference_detailview(request, pk=pk)
-    #     self.assertEqual(response.status_code, STATUS_OK)
-    #     reference = JobReference.objects.filter(creator=self.non_super_user)[0]
-    #     self.assertEqual(reference.name, data['name'])
-    #     self.assertEqual(reference.creator_id, self.non_super_user.id)
-    #
+    def test_simple_patch(self):
+        """
+        Normal users should be able to PATCH their own objects. Superusers
+        should be able to PATCH all objects.
+        """
+        # Normal user PATCH own object
+        pk = self.normal_application.pk
+        url = reverse('jobapplication-detail', args=[pk])
+        data = {
+            'position': 'Patched Application',
+        }
+        request = self.factory.patch(url, data)
+        force_authenticate(request, self.non_super_user)
+        response = self.application_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        application = JobApplication.objects.filter(
+            creator=self.non_super_user
+        )[0]
+        return_data = response.data
+        self.assertEqual(application.position, data['position'])
+        self.assertEqual(application.position, return_data['position'])
+        self.assertEqual(application.creator_id, self.non_super_user.id)
+
+        # Superuser PATCH own object
+        pk = self.super_user_application.pk
+        url = reverse('jobapplication-detail', args=[pk])
+        data = {
+            'city': 'Worchestershire'
+        }
+        request = self.factory.patch(url, data)
+        force_authenticate(request, self.super_user)
+        response = self.application_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        application = JobApplication.objects.filter(creator=self.super_user)[0]
+        self.assertEqual(application.city, data['city'])
+        self.assertEqual(application.creator_id, self.super_user.id)
+
+        # Superuser PATCH other object
+        pk = self.normal_application.pk
+        url = reverse('jobapplication-detail', args=[pk])
+        data = {
+            'position': 'Patched Application Again Again',
+        }
+        request = self.factory.patch(url, data)
+        force_authenticate(request, self.super_user)
+        response = self.application_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        application = JobApplication.objects.filter(
+            creator=self.non_super_user
+        )[0]
+        self.assertEqual(application.position, data['position'])
+        self.assertEqual(application.creator_id, self.non_super_user.id)
+
+    def test_update_application_valid_methods(self):
+        """
+        Patch requests with valid `update_method` fields should update the
+        underlying database object appropriately. This method walks a request
+        through the update chain, also checking that you can reject from every
+        state.
+        """
+        # Make sure we have a clean slate
+        self.assertEqual(self.normal_application.status, 'submitted')
+
+        # Get object PK and detail url
+        pk = self.normal_application.pk
+        url = reverse('jobapplication-detail', args=[pk])
+
+        # data dictionaries
+        reject_data = {
+            'update_method': 'reject',
+            'rejected_reason': 'No Good Reason, we just don\'t like you'
+        }
+        normal_data = {
+            'update_method': 'send_followup'
+        }
+
+        # submitted to rejected
+        request = self.factory.patch(url, reject_data)
+        force_authenticate(request, self.non_super_user)
+        response = self.application_detailview(request, pk=pk)
+        application = JobApplication.objects.get(creator=self.non_super_user)
+        self.assertEqual(response.status_code, STATUS_OK)
+        self.assertEqual(response.data['status'], 'rejected')
+        self.assertEqual(application.rejected_reason,
+                         reject_data['rejected_reason'])
+
+        # submitted to followup sent
+        application.rejected_reason = None
+        application.status = 'submitted'
+        application.save()
+        request = self.factory.patch(url, normal_data)
+        force_authenticate(request, self.non_super_user)
+        response = self.application_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        application = JobApplication.objects.get(creator=self.non_super_user)
+        self.assertEqual(application.status, 'followup_sent')
+
+        # followup sent to rejected
+        request = self.factory.patch(url, reject_data)
+        force_authenticate(request, self.non_super_user)
+        response = self.application_detailview(request, pk=pk)
+        application = JobApplication.objects.get(creator=self.non_super_user)
+        self.assertEqual(response.status_code, STATUS_OK)
+        self.assertEqual(response.data['status'], 'rejected')
+        self.assertEqual(application.rejected_reason,
+                         reject_data['rejected_reason'])
+
+        # followup sent to phone screen complete
+        application.rejected_reason = None
+        application.status = 'followup_sent'
+        application.save()
+        normal_data['update_method'] = 'phone_screen'
+        request = self.factory.patch(url, normal_data)
+        force_authenticate(request, self.non_super_user)
+        response = self.application_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        application = JobApplication.objects.get(creator=self.non_super_user)
+        self.assertEqual(application.status, 'phone_screen_complete')
+
+        # phone screen complete to rejected
+        request = self.factory.patch(url, reject_data)
+        force_authenticate(request, self.non_super_user)
+        response = self.application_detailview(request, pk=pk)
+        application = JobApplication.objects.get(creator=self.non_super_user)
+        self.assertEqual(response.status_code, STATUS_OK)
+        self.assertEqual(response.data['status'], 'rejected')
+        self.assertEqual(application.rejected_reason,
+                         reject_data['rejected_reason'])
+
+        # phone screen complete to interview scheduled
+        interview_date = date.today() + timedelta(days=7)
+        application.rejected_reason = None
+        application.status = 'phone_screen_complete'
+        application.save()
+        normal_data['update_method'] = 'schedule_interview'
+        normal_data['interview_date'] = interview_date.isoformat()
+        request = self.factory.patch(url, normal_data)
+        force_authenticate(request, self.non_super_user)
+        response = self.application_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        application = JobApplication.objects.get(creator=self.non_super_user)
+        self.assertEqual(application.status, 'interview_scheduled')
+        self.assertEqual(application.interview_date, interview_date)
+        self.assertEqual(response.data['interview_date'],
+                         interview_date.isoformat())
+
+        # interview scheduled to rejected
+        request = self.factory.patch(url, reject_data)
+        force_authenticate(request, self.non_super_user)
+        response = self.application_detailview(request, pk=pk)
+        application = JobApplication.objects.get(creator=self.non_super_user)
+        self.assertEqual(response.status_code, STATUS_OK)
+        self.assertEqual(response.data['status'], 'rejected')
+        self.assertEqual(application.rejected_reason,
+                         reject_data['rejected_reason'])
+
+        # interview scheduled to interview complete
+        application.rejected_reason = None
+        application.status = 'interview_scheduled'
+        application.interview_date = date.today()
+        application.save()
+        normal_data['update_method'] = 'complete_interview'
+        request = self.factory.patch(url, normal_data)
+        force_authenticate(request, self.non_super_user)
+        response = self.application_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        application = JobApplication.objects.get(creator=self.non_super_user)
+        self.assertEqual(application.status, 'interview_complete')
+
+        # interview complete to rejected
+        request = self.factory.patch(url, reject_data)
+        force_authenticate(request, self.non_super_user)
+        response = self.application_detailview(request, pk=pk)
+        application = JobApplication.objects.get(creator=self.non_super_user)
+        self.assertEqual(response.status_code, STATUS_OK)
+        self.assertEqual(response.data['status'], 'rejected')
+        self.assertEqual(application.rejected_reason,
+                         reject_data['rejected_reason'])
+
+        # interview complete to offer received
+        application.rejected_reason = None
+        application.status = 'interview_complete'
+        application.save()
+        normal_data['update_method'] = 'receive_offer'
+        request = self.factory.patch(url, normal_data)
+        force_authenticate(request, self.non_super_user)
+        response = self.application_detailview(request, pk=pk)
+        self.assertEqual(response.status_code, STATUS_OK)
+        application = JobApplication.objects.get(creator=self.non_super_user)
+        self.assertEqual(application.status, 'offer_received')
+
+    def test_update_application_invalid_methods(self):
+        """
+        Sending PATCH requests with invalid `update_method` should return 400
+        Bad Request
+        """
+        # Make sure we have a clean slate
+        self.assertEqual(self.normal_application.status, 'submitted')
+
+        # Get object PK and detail url
+        pk = self.normal_application.pk
+        url = reverse('jobapplication-detail', args=[pk])
+
+        # data
+        methods = ['phone_screen', 'send_followup', 'schedule_interview',
+                   'complete_interview', 'receive_offer']
+        data = {}
+
+        # invalid from submitted
+        for method in methods:
+            data['update_method'] = method
+            if method != 'send_followup':
+                request = self.factory.patch(url, data)
+                force_authenticate(request, self.non_super_user)
+                response = self.application_detailview(request, pk=pk)
+                self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+
+        # invalid from followup sent
+        self.normal_application.send_followup()
+        self.normal_application.save()
+        self.assertEqual(self.normal_application.status, 'followup_sent')
+        for method in methods:
+            data['update_method'] = method
+            if method != 'phone_screen':
+                request = self.factory.patch(url, data)
+                force_authenticate(request, self.non_super_user)
+                response = self.application_detailview(request, pk=pk)
+                self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
+
+        # invalid from phone screen
+        self.normal_application.phone_screen()
+        self.normal_application.save()
+        for method in methods:
+            data['update_method'] = method
+            if method != 'schedule_interview':
+                request = self.factory.patch(url, data)
+                force_authenticate(request, self.non_super_user)
+                response = self.application_detailview(request, pk=pk)
+                self.assertEqual(response.status_code,
+                                 STATUS_BAD_REQUEST)
+
+        # invalid from interview scheduled
+        self.normal_application.schedule_interview(date.today())
+        self.normal_application.save()
+        for method in methods:
+            if method != 'complete_interview':
+                data['update_method'] = method
+                request = self.factory.patch(url, data)
+                force_authenticate(request, self.non_super_user)
+                response = self.application_detailview(request, pk=pk)
+                self.assertEqual(response.status_code,
+                                 STATUS_BAD_REQUEST)
+
+        self.normal_application.complete_interview()
+        self.normal_application.save()
+        for method in methods:
+            if method != 'receive_offer':
+                data['update_method'] = method
+                request = self.factory.patch(url, data)
+                force_authenticate(request, self.non_super_user)
+                response = self.application_detailview(request, pk=pk)
+                self.assertEqual(response.status_code,
+                                 STATUS_BAD_REQUEST)
+
     def test_normal_user_patch_other(self):
         """
         Normal users should not be able to PATCH objects made by others. These
@@ -1982,20 +2204,6 @@ class JobApplicationViewsetTests(BaseJobapplicationViewsetTests):
         self.assertNotEqual(application.position, application_data['position'])
         self.assertNotEqual(application.creator_id, self.non_super_user.id)
 
-    # def test_invalid_patch(self):
-    #     """
-    #     PATCH requests with invalid data should fail with status 400 Bad Request
-    #     """
-    #     pk = self.super_user_reference.pk
-    #     url = reverse('jobreference-detail', args=[pk])
-    #     invalid_email = {
-    #         'email': 'notan@email'
-    #     }
-    #     request = self.factory.patch(url, invalid_email)
-    #     force_authenticate(request, self.super_user)
-    #     response = self.reference_detailview(request, pk=pk)
-    #     self.assertEqual(response.status_code, STATUS_BAD_REQUEST)
-    #
     def test_user_deletes_own(self):
         """
         Both normal user and superuser should be able to DELETE objects they

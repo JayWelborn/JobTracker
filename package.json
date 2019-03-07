@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "webpack --mode development ./jobtracker/frontend/src/index.js --output ./jobtracker/frontend/static/frontend/main.js",
+    "dev": "webpack --mode development --watch ./jobtracker/frontend/src/index.js --output ./jobtracker/frontend/static/frontend/main.js",
     "build": "webpack --mode production ./jobtracker/frontend/src/index.js --output ./jobtracker/frontend/static/frontend/main.js"
   },
   "repository": {
@@ -24,9 +24,16 @@
     "@babel/preset-react": "^7.0.0",
     "babel-loader": "^8.0.4",
     "babel-plugin-transform-class-properties": "^6.24.1",
+    "browser-sync": "^2.26.3",
+    "browser-sync-webpack-plugin": "^2.2.2",
+    "css-loader": "^2.1.0",
+    "mini-css-extract-plugin": "^0.5.0",
+    "node-sass": "^4.11.0",
     "prop-types": "^15.6.2",
     "react": "^16.6.3",
     "react-dom": "^16.6.3",
+    "sass-loader": "^7.1.0",
+    "style-loader": "^0.23.1",
     "webpack": "^4.26.1",
     "webpack-cli": "^3.1.2"
   },

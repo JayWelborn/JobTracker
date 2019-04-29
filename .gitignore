@@ -23,8 +23,8 @@ secrets/
 
 #generated files
 webpack-stats.json
-*/main.js
+main.js
 
 # coverage report
-.coverage
+.coverage*
 coverage/

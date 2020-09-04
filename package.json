@@ -28,7 +28,7 @@
     "browser-sync-webpack-plugin": "^2.2.2",
     "css-loader": "^2.1.0",
     "mini-css-extract-plugin": "^0.5.0",
-    "node-sass": "^4.11.0",
+    "node-sass": "^4.13.1",
     "prop-types": "^15.6.2",
     "react": "^16.6.3",
     "react-dom": "^16.6.3",

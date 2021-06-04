@@ -2,7 +2,7 @@ certifi==2018.11.29
 chardet==3.0.4
 codecov==2.0.15
 coverage==4.5.2
-Django==2.2.2
+Django==2.2.21
 django-fsm==2.6.0
 djangorestframework==3.9.4
 idna==2.8
